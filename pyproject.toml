@@ -1,0 +1,42 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "pact"
+version = "0.0.1"
+description = "A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation and Monitoring"
+authors = [
+  { name = "Rodrigo Florindo" },
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License"
+]
+dependencies = [
+    "dvc>=3.67.1",
+    "matplotlib>=3.10.9",
+    "numpy>=2.4.4",
+    "pip",
+    "pytest",
+    "python-dotenv",
+    "ruff",
+    "scipy>=1.17.1",
+]
+requires-python = "~=3.12.0"
+
+
+[tool.ruff]
+line-length = 99
+src = ["pact"]
+include = ["pyproject.toml", "pact/**/*.py"]
+
+[tool.ruff.lint]
+extend-select = ["I"]  # Add import sorting
+
+[tool.ruff.lint.isort]
+known-first-party = ["pact"]
+force-sort-within-sections = true
+
