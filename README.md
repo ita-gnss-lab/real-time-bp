@@ -59,3 +59,13 @@ A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation
 
 --------
 
+## Installation
+
+Use
+```bash
+uv sync
+git submodule update --init --recursive
+```
+to install all dependencies.
+
+

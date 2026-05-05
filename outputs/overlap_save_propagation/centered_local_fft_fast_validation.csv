@@ -1,0 +1,3 @@
+block_len,window,num_checked_samples,max_abs_difference
+128,rectangular,384,8.455206652451151e-16
+128,hann,384,7.108895957933346e-16

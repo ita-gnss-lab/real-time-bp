@@ -1,0 +1,3 @@
+[submodule "tools/submodules/gnss-scintillation-simulator"]
+	path = tools/submodules/gnss-scintillation-simulator
+	url = git@github.com:ita-gnss-lab/gnss-scintillation-simulator.git

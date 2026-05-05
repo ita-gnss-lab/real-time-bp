@@ -17,9 +17,11 @@ classifiers = [
 ]
 dependencies = [
     "dvc>=3.67.1",
+    "ipykernel>=7.2.0",
     "matplotlib>=3.10.9",
     "numpy>=2.4.4",
     "pip",
+    "pydynamic>=2.5.1",
     "pytest",
     "python-dotenv",
     "ruff",

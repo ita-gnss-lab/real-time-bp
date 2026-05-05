@@ -1,0 +1,2 @@
+N,N_fft_from_mat,Fs_hz,dt_s,rho_over_v_s,output_dir
+15360,15360,50.0,0.02,2.0,\\wsl.localhost\Ubuntu-24.04\home\rodrigo\github\pa-carrier-tracking\outputs\overlap_save_propagation
