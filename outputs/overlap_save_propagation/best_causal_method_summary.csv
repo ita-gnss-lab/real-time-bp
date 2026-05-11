@@ -1,0 +1,2 @@
+selected_by,method,block_len,causal_include_zero_lag,latency_samples,latency_s,warmup_samples,field_rel_error,amp_rmse,phase_rmse_rad,amp_corr
+phase_rmse_rad,causal_nonnegative_lag_filter,4096,True,0,0.0,2047,0.5068816177468982,0.40235267548968356,0.5816022909410636,0.6194782621819147

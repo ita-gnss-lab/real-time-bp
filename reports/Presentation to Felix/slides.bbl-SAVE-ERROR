@@ -1,0 +1,180 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.2 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global}
+    \entry{breitschMitigationGlobalNavigation2023}{article}{}
+      \name{author}{2}{}{%
+        {{hash=387e6f31aed98601f7f28e17ed0eea51}{%
+           family={Breitsch},
+           familyi={B\bibinitperiod},
+           given={Brian},
+           giveni={B\bibinitperiod}}}%
+        {{hash=986ff646318c98a0f75eb660cc0ca7e5}{%
+           family={Morton},
+           familyi={M\bibinitperiod},
+           given={Jade},
+           giveni={J\bibinitperiod}}}%
+      }
+      \list{publisher}{1}{%
+        {Institute of Navigation}%
+      }
+      \strng{namehash}{161831139d292e059b71e65081d5eb20}
+      \strng{fullhash}{161831139d292e059b71e65081d5eb20}
+      \strng{bibnamehash}{161831139d292e059b71e65081d5eb20}
+      \strng{authorbibnamehash}{161831139d292e059b71e65081d5eb20}
+      \strng{authornamehash}{161831139d292e059b71e65081d5eb20}
+      \strng{authorfullhash}{161831139d292e059b71e65081d5eb20}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{abstract}{Measurements of signals from satellites from global navigation satellite systems are an important tool not only for precision navigation and timing applications, but also for various scientific and remote-sensing applications such as ionosphere monitoring and atmosphere probing using radio occultation. When traveling through turbulent patches of the Earth's ionosphere, these signals can experience scintillation, which is characterized by rapid fluctuations in the amplitude and phase of the received signal. In addition to these fluctuations, the signal can undergo phase transitions that induce cycle slips in the resulting phase measurement. When left uncorrected, cycle slips can lead to large errors in positioning and remote-sensing applications. In this work, we determine how backpropagation based on a single-phase screen model of the ionosphere can help to limit the occurrence of these cycle slips. This approach is applicable for batch post-processing of measurements. Furthermore, our results when applying the method to both simulations and real-life data suggest that backpropagation can correct many of the cycle slips that are generated during severe scintillation.}
+      \field{chapter}{Original Article}
+      \field{issn}{0028-1522, 2161-4296}
+      \field{journaltitle}{NAVIGATION: Journal of the Institute of Navigation}
+      \field{langid}{english}
+      \field{month}{9}
+      \field{number}{3}
+      \field{title}{Mitigation of {{Global Navigation Satellite System Cycle Slips Due}} to {{Scintillation Using Radio Backpropagation}}}
+      \field{urlday}{18}
+      \field{urlmonth}{4}
+      \field{urlyear}{2025}
+      \field{volume}{70}
+      \field{year}{2023}
+      \field{urldateera}{ce}
+      \verb{doi}
+      \verb 10.33012/navi.593
+      \endverb
+      \verb{file}
+      \verb C:\Users\rodri\Zotero\storage\F94P3XTV\Breitsch and Morton - 2023 - Mitigation of Global Navigation Satellite System Cycle Slips Due to Scintillation Using Radio Backpr.pdf
+      \endverb
+      \keyw{backpropagation,cycle slips,global navigation satellite system,scintillation}
+    \endentry
+    \entry{vasylyevModelingIonosphericScintillation2022}{article}{}
+      \name{author}{5}{}{%
+        {{hash=927c9ed368aaafb513b2b30716c71c84}{%
+           family={Vasylyev},
+           familyi={V\bibinitperiod},
+           given={Dmytro},
+           giveni={D\bibinitperiod}}}%
+        {{hash=95ab6b74bcfd88617353f0d869d02c5c}{%
+           family={Béniguel},
+           familyi={B\bibinitperiod},
+           given={Yannick},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=5a2e682fc596c82fa9d04bad07aca383}{%
+           family={Volker},
+           familyi={V\bibinitperiod},
+           given={Wilken},
+           giveni={W\bibinitperiod}}}%
+        {{hash=1f13e56d97c040916b6d1bea6acd69c2}{%
+           family={Kriegel},
+           familyi={K\bibinitperiod},
+           given={Martin},
+           giveni={M\bibinitperiod}}}%
+        {{hash=b2ea6f1e33f0f7b8232d2ea41e482e25}{%
+           family={Berdermann},
+           familyi={B\bibinitperiod},
+           given={Jens},
+           giveni={J\bibinitperiod}}}%
+      }
+      \strng{namehash}{74cdf9fc9ab31f8920a33c4f29a524a4}
+      \strng{fullhash}{002619ff267f3b868ab89fc5713c17e6}
+      \strng{bibnamehash}{002619ff267f3b868ab89fc5713c17e6}
+      \strng{authorbibnamehash}{002619ff267f3b868ab89fc5713c17e6}
+      \strng{authornamehash}{74cdf9fc9ab31f8920a33c4f29a524a4}
+      \strng{authorfullhash}{002619ff267f3b868ab89fc5713c17e6}
+      \field{sortinit}{3}
+      \field{sortinithash}{ad6fe7482ffbd7b9f99c9e8b5dccd3d7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{abstract}{A signal, such as from a GNSS satellite or microwave sounding system, propagating in the randomly inhomogeneous ionosphere, experiences chaotic modulations of its amplitude and phase. This effect is known as scintillation. This article reviews basic theoretical concepts and simulation strategies for modeling the scintillation phenomenon. We focused our attention primarily on the methods connected with the random phase screen model. For a weak scattering regime on random ionospheric irregularities, a single-phase screen model enables us to obtain the analytic expression for phase and intensity scintillation indices, as well as the statistical quantities characterizing the strength of scintillation-related fades and distortions. In the case of multiple scattering, the simulation with multiple phase screens becomes a handy tool for obtaining these indices. For both scattering regimes, the statistical properties of the ionospheric random medium play an important role in scintillation modeling and are discussed with an emphasis on related geometric aspects. As an illustration, the phase screen simulation approaches used in the global climatological scintillation model GISM are briefly discussed.}
+      \field{issn}{2115-7251}
+      \field{journaltitle}{Journal of Space Weather and Space Climate}
+      \field{langid}{english}
+      \field{title}{Modeling of Ionospheric Scintillation}
+      \field{urlday}{25}
+      \field{urlmonth}{3}
+      \field{urlyear}{2025}
+      \field{volume}{12}
+      \field{year}{2022}
+      \field{urldateera}{ce}
+      \field{pages}{22}
+      \range{pages}{1}
+      \verb{doi}
+      \verb 10.1051/swsc/2022016
+      \endverb
+      \verb{file}
+      \verb C:\Users\rodri\Zotero\storage\EI7TV3I7\Vasylyev et al. - 2022 - Modeling of ionospheric scintillation.pdf
+      \endverb
+    \endentry
+    \entry{jiaoIonosphericScintillationSimulation2018}{article}{}
+      \name{author}{3}{}{%
+        {{hash=b56f7a48e9b439a9aea32c2e96e104a1}{%
+           family={Jiao},
+           familyi={J\bibinitperiod},
+           given={Yu},
+           giveni={Y\bibinitperiod}}}%
+        {{hash=3ec66f77f1a710c88cec0bdb21242a52}{%
+           family={Rino},
+           familyi={R\bibinitperiod},
+           given={Charles},
+           giveni={C\bibinitperiod}}}%
+        {{hash=1a2ae1be8c33254ed09aa712a9bcb6af}{%
+           family={Morton},
+           familyi={M\bibinitperiod},
+           given={Yu\bibnamedelima T.},
+           giveni={Y\bibinitperiod\bibinitdelim T\bibinitperiod}}}%
+      }
+      \strng{namehash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \strng{fullhash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \strng{bibnamehash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \strng{authorbibnamehash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \strng{authornamehash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \strng{authorfullhash}{d77b989f7c6bbe95e9a30b1e1d60302a}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{issn}{0028-1522, 2161-4296}
+      \field{journaltitle}{NAVIGATION}
+      \field{langid}{english}
+      \field{month}{6}
+      \field{number}{2}
+      \field{title}{Ionospheric {{Scintillation Simulation}} on {{Equatorial GPS Signals}} for {{Dynamic Platforms}}}
+      \field{urlday}{25}
+      \field{urlmonth}{3}
+      \field{urlyear}{2025}
+      \field{volume}{65}
+      \field{year}{2018}
+      \field{urldateera}{ce}
+      \field{pages}{263\bibrangedash 274}
+      \range{pages}{12}
+      \verb{doi}
+      \verb 10.1002/navi.231
+      \endverb
+      \verb{file}
+      \verb C:\Users\rodri\Zotero\storage\CMZTP6BD\Jiao et al. - 2018 - Ionospheric Scintillation Simulation on Equatorial GPS Signals for Dynamic Platforms.pdf
+      \endverb
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+
