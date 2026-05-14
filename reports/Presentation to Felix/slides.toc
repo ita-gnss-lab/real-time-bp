@@ -3,3 +3,5 @@
 \beamer@sectionintoc {2}{The Split-Step Algorithm}{6}{0}{2}
 \beamer@sectionintoc {3}{Radio Backpropagation}{11}{0}{3}
 \beamer@sectionintoc {4}{Towards Real-Time Backpropagation}{13}{0}{4}
+\beamer@sectionintoc {5}{Remarks on $\rho _{\mathrm {F}} / v_{\mathrm {eff}}$ Estimation}{20}{0}{5}
+\beamer@sectionintoc {6}{Short-Term Goals for ION GNSS+ 2026}{23}{0}{6}

@@ -19,11 +19,11 @@
 \renewcommand*{\bibfont}{\scriptsize}
 \setbeamertemplate{bibliography item}[text]
 
-\title{Real-Time Ionospheric Scintillation Mitigation and Monitoring Using Radio Backpropagation}
+\title{Towards Real-Time Ionospheric Scintillation Mitigation and Monitoring Using Radio Backpropagation}
 \subtitle{Current Development and Goals}
 \author{Rodrigo de Lima Florindo}
 \institute{Aeronautics Institute of Technology}
-\date{\today}
+\date{May 12, 2026}
 
 \begin{document}
 
@@ -77,7 +77,7 @@
         \exp \left\{ -j\left( n\Delta \mu \right)^2 /2 \right\}
         \exp \left\{ 2\pi j n m /N \right\} \mathrm{,}
     \end{align}
-    where $\overline{\phi}_{\mathrm{R}, l}\left[m\right]$ is a phase realization sampled from a modeled power spectral density, $m$ is a discrete length in the eastward direction, and $n$ is its spatial frequency counterpart that varies from -. $\rho_{\mathrm{F}} = \sqrt{x / k}$ denotes the Fresnel scale, where $k$ is the carrier's wavenumber, and $\Delta \mu = 2 \pi \Delta f \rho_{\mathrm{F}} / v_{\mathrm{eff}}$ is the normalized wavenumber resolution, with $v_{\mathrm{eff}}$ as the ionospheric piercing point effective scan velocity.
+    where $\overline{\phi}_{\mathrm{R}, l}\left[m\right]$ is a phase realization sampled from a modeled power spectral density, $m$ is a discrete length in the eastward direction, and $n$ is its spatial frequency counterpart. $\rho_{\mathrm{F}} = \sqrt{x / k}$ denotes the Fresnel scale, where $k$ is the carrier's wavenumber, and $\Delta \mu = 2 \pi \Delta f \rho_{\mathrm{F}} / v_{\mathrm{eff}}$ is the normalized wavenumber resolution, with $v_{\mathrm{eff}}$ as the ionospheric piercing point effective scan velocity.
 \end{frame}
 
 \begin{frame}{The Split-Step Algorithm}
@@ -136,30 +136,55 @@
         \begin{cases}
             \psi\left[k+r-M_{\mathrm{c}}\right],
             & 0 \leq r \leq M_{\mathrm{c}} + L, \\
-            \widehat{\psi}_{k,L}^{\mathrm{VAR}}\left[r\right],
+            \widehat{\psi}_{k,L}\left[ r \right],
             & M_{\mathrm{c}} + L < r \leq M-1,
         \end{cases}
         \quad
         M_{\mathrm{c}} = \left\lfloor M/2 \right\rfloor \mathrm{.}
     \end{align}
-    where $\mathrm{FFT}_{M}$ and $\mathrm{FFT}^{-1}_{M}$ refer to an $M$-point FFT and inverse FFT, respectively, $w \left[ r \right]$ represents a windowing function, and $\widehat{\psi}_{k,L}^{\mathrm{VAR}}\left[r\right]$ is the VAR forecast for $\psi\left[k+r-M_{\mathrm{c}}\right]$ using samples available up to $k+L$.
+    where $\mathrm{FFT}_{M}$ and $\mathrm{FFT}^{-1}_{M}$ refer to an $M$-point FFT and inverse FFT, respectively, $w \left[ r \right]$ represents a windowing function, and $\widehat{\psi}_{k,L}\left[r\right]$ is a forecast for $\psi\left[k+r-M_{\mathrm{c}}\right]$ using samples available up to $k+L$.
 \end{frame}
 
 \begin{frame}{Towards Real-Time Backpropagation}
-    The sliding-window FFT is noncausal because the reliable output of each finite FFT block is the center sample. The inverse propagation filter has temporal spread, so estimating the backpropagated field at time $k$ requires signal context on both sides of $k$; otherwise, the estimate is dominated by block-edge artifacts. In the notebook, the latency values $L \in \left\{ 0, 64, 128, 256 \right\}$ were evaluated. For $M=1024$, the full noncausal sliding-window reference corresponds to $L=M-M_{\mathrm{c}}-1=511$, in which no VAR forecast is needed.
+    We chose the sliding-window FFT as noncausal because the reliable output of each finite FFT block is the center sample. The inverse propagation filter has temporal spread, so estimating the backpropagated field at time $k$ requires signal context on both sides of $k$; otherwise, the estimate is dominated by block-edge artifacts.
 
     Note that this method is only feasible under the following conditions:
     \begin{enumerate}
         \item $M$ is sufficiently high, such that the sliding backpropagated field $\psi_{\mathrm{BP}, L}^{\mathrm{sliding}}\left[k\right]$ is sufficiently close to the backpropagated signal in batch $\psi_{BP} \left[ k \right]$;
-        \item The unavailable future samples from $k+L+1$ to $k+M-M_{\mathrm{c}}-1$ can be predicted with sufficient accuracy. If $L=M-M_{\mathrm{c}}-1$, the method becomes Full Noncausal Sliding Window BP.
+        \item The unavailable future samples from $k+L+1$ to $k+M-M_{\mathrm{c}}-1$ can be predicted with sufficient accuracy. For $L=M-M_{\mathrm{c}}-1$, the method becomes full noncausal sliding window BP, and for $L = 0$, the backpropagation approach occurs in real time.
     \end{enumerate}
 \end{frame}
 
 \begin{frame}{Towards Real-Time Backpropagation}
-    To solve the issue 
+    \centering
+    \includegraphics[width=0.85\linewidth]{../figures/sliding_window_bp_with_buffer_error_summary.png}
+    \\\vspace{0.5em}
+    \small Figure 1: Error metrics for full noncausal backpropagation using different windowing functions (using $L = M - M_c - 1$; without forecasting)
 \end{frame}
 
-\begin{frame}{Estimating $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$}
+\begin{frame}{Towards Real-Time Backpropagation}
+    \centering
+    \includegraphics[width=0.9\linewidth]{../figures/real_imag_var_forecast_example_complex_parts.png}
+    \\\vspace{0.5em}
+    \small Figure 2: Example of forecasts provided by VAR models with different $L$. The VAR model with order 4 was employed for the real and imaginary parts of the estimated scintillation signal. The first 3500 samples were used to fit the model.
+\end{frame}
+
+\begin{frame}{Towards Real-Time Backpropagation}
+    \centering
+    \includegraphics[width=0.85\linewidth]{../figures/sliding_window_bp_latency_error_overlay.png}
+    \\\vspace{0.5em}
+    \small Figure 3: Relative field error $\frac{\left\| \psi_{\mathrm{BP}}^{\mathrm{sliding}} \left[ k \right] - \exp \left( j \overline{\phi}_{\mathrm{R}} \left[ k \right] \right) \right\|_2}{\left\| \exp \left( j \overline{\phi}_{\mathrm{R}} \left[ k \right] \right) \right\|_2}$ for fixed $M = 1024$ and varying latencies $L$.
+\end{frame}
+
+\begin{frame}{Towards Real-Time Backpropagation}
+    \centering
+    \includegraphics[width=0.9\linewidth]{../figures/phase_sliding_window_bp_var_forecasting_true_phi_R.png}
+    \\\vspace{0.5em}
+    \small Figure 4: Comparison between the true refractive phase $\overline{\phi}_{\mathrm{R}} \left[ k \right]$ and the estimated phase obtained with the sliding window BP for different latencies.
+\end{frame}
+
+\section{Remarks on $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ Estimation}
+\begin{frame}{Remarks on $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ Estimation}
     \begin{itemize}
         \item In \parencite{breitschMitigationGlobalNavigation2023}, $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ estimates were obtained by performing an inverse mapping of the scintillation intensity index $S_4$ and the decorrelation time $\tau_0$; (This mapping is not very clear in their work, so it can be difficult to implement this)
         \item On the problem of identifying the position of equatorial plasma bubbles using GNSS radio occultation measurements, \parencite{alfonsoBackPropagationMethod2024} propose to find the phase-screen location by minimizing the standard deviation of the measured scintillation amplitude. Similarly, it should be possible to instead search $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ using the same approach;
@@ -167,11 +192,21 @@
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Estimating $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$}
+\begin{frame}{Remarks on $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ Estimation}
     Thus, I understand that a reasonable (and easy) way of estimating $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$ in real-time consists in defining a bank of inverse propagation kernels defined with linearly spaced values of $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$, and performing backpropagation of a measured scintillation signal for each of them. The most suitable kernel can be chosen as the one that minimizes the scintillation amplitude standard deviation.
 \end{frame}
 
+\section{Short-Term Goals for ION GNSS+ 2026}
 
+\begin{frame}{Short-Term Goals for ION GNSS+ 2026}
+    \begin{enumerate}
+        \item Use a scintillation signal dataset obtained from tracking loops (I would choose either a standard Kalman filter--Wiener model only or an FLL-Assisted PLL--closer to what is implemented in CoTS receivers)
+        \item Implement three machine learning models for forecasting, comparing with the VAR model baseline (LSTM/GRU, PATCHTST--Transformer, NHITS--Neural Hierarchical Interpolation)
+        \item Implement the bank of filters for estimating $\rho_{\mathrm{F}} / v_{\mathrm{eff}}$
+        \item Evaluate loss-of-lock and cycle-slips mitigation statistics.
+        \item It would be great to validate the results using real measurements. Despite the known problems on the signal processing methods implemented on CoTS receivers, I believe that backpropagation may help on the scintillation mitigation and monitoring using .
+    \end{enumerate}
+\end{frame}
 
 \appendix % frames below this line won't count toward total slide numbering
 

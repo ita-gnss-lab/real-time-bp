@@ -1,4 +1,4 @@
-# project_name
+# real-time-bp
 
 <a target="_blank" href="https://cookiecutter-data-science.drivendata.org/">
     <img src="https://img.shields.io/badge/CCDS-Project%20template-328F97?logo=cookiecutter" />
@@ -27,7 +27,7 @@ A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation
 │                         `1.0-jqp-initial-data-exploration`.
 │
 ├── pyproject.toml     <- Project configuration file with package metadata for 
-│                         pact and configuration for tools like black
+│                         real-time-bp and configuration for tools like black
 │
 ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
 │
@@ -39,9 +39,9 @@ A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation
 │
 ├── setup.cfg          <- Configuration file for flake8
 │
-└── pact   <- Source code for use in this project.
+└── real_time_bp   <- Source code for use in this project.
     │
-    ├── __init__.py             <- Makes pact a Python module
+    ├── __init__.py             <- Makes real_time_bp a Python module
     │
     ├── config.py               <- Store useful variables and configuration
     │
@@ -67,5 +67,4 @@ uv sync
 git submodule update --init --recursive
 ```
 to install all dependencies.
-
 

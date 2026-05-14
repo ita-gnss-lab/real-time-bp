@@ -46,20 +46,38 @@
 \headcommand {\beamer@framepages {17}{17}}
 \headcommand {\slideentry {4}{0}{6}{18/18}{}{0}}
 \headcommand {\beamer@framepages {18}{18}}
-\headcommand {\gdef \insertmainframenumber {13}}
-\headcommand {\partentry {\translate {Appendix}}{1}}
-\headcommand {\beamer@partpages {1}{18}}
-\headcommand {\beamer@sectionpages {13}{18}}
-\headcommand {\beamer@subsectionpages {13}{18}}
-\headcommand {\beamer@appendixpages {19}}
-\headcommand {\slideentry {4}{0}{7}{19/19}{}{1}}
+\headcommand {\slideentry {4}{0}{7}{19/19}{}{0}}
 \headcommand {\beamer@framepages {19}{19}}
-\headcommand {\slideentry {4}{0}{7}{19/20}{}{1}}
-\headcommand {\beamer@framepages {19}{20}}
-\headcommand {\beamer@partpages {19}{20}}
-\headcommand {\beamer@subsectionpages {19}{20}}
-\headcommand {\beamer@sectionpages {19}{20}}
-\headcommand {\beamer@documentpages {20}}
+\headcommand {\beamer@sectionpages {13}{19}}
+\headcommand {\beamer@subsectionpages {13}{19}}
+\headcommand {\sectionentry {5}{Remarks on $\rho _{\mathrm {F}} / v_{\mathrm {eff}}$ Estimation}{20}{Remarks on $\rho _{\mathrm {F}} / v_{\mathrm {eff}}$ Estimation}{0}}
+\headcommand {\slideentry {5}{0}{1}{20/20}{}{0}}
+\headcommand {\beamer@framepages {20}{20}}
+\headcommand {\slideentry {5}{0}{2}{21/21}{}{0}}
+\headcommand {\beamer@framepages {21}{21}}
+\headcommand {\slideentry {5}{0}{3}{22/22}{}{0}}
+\headcommand {\beamer@framepages {22}{22}}
+\headcommand {\beamer@sectionpages {20}{22}}
+\headcommand {\beamer@subsectionpages {20}{22}}
+\headcommand {\sectionentry {6}{Short-Term Goals for ION GNSS+ 2026}{23}{Short-Term Goals for ION GNSS+ 2026}{0}}
+\headcommand {\slideentry {6}{0}{1}{23/23}{}{0}}
+\headcommand {\beamer@framepages {23}{23}}
+\headcommand {\slideentry {6}{0}{2}{24/24}{}{0}}
+\headcommand {\beamer@framepages {24}{24}}
+\headcommand {\gdef \insertmainframenumber {17}}
+\headcommand {\partentry {\translate {Appendix}}{1}}
+\headcommand {\beamer@partpages {1}{24}}
+\headcommand {\beamer@sectionpages {23}{24}}
+\headcommand {\beamer@subsectionpages {23}{24}}
+\headcommand {\beamer@appendixpages {25}}
+\headcommand {\slideentry {6}{0}{3}{25/25}{}{1}}
+\headcommand {\beamer@framepages {25}{25}}
+\headcommand {\slideentry {6}{0}{3}{25/26}{}{1}}
+\headcommand {\beamer@framepages {25}{26}}
+\headcommand {\beamer@partpages {25}{26}}
+\headcommand {\beamer@subsectionpages {25}{26}}
+\headcommand {\beamer@sectionpages {25}{26}}
+\headcommand {\beamer@documentpages {26}}
 \headcommand {\gdef \inserttotalframenumber {2}}
-\headcommand {\gdef \inserttotalframenumber {13}}
+\headcommand {\gdef \inserttotalframenumber {17}}
 \headcommand {\gdef \appendixtotalframenumber {2}}

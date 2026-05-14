@@ -2,7 +2,7 @@
 # GLOBALS                                                                       #
 #################################################################################
 
-PROJECT_NAME = pact
+PROJECT_NAME = real-time-bp
 PYTHON_VERSION = 3.12
 PYTHON_INTERPRETER = python
 

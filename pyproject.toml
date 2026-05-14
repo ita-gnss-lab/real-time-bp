@@ -3,7 +3,7 @@ requires = ["flit_core >=3.2,<4"]
 build-backend = "flit_core.buildapi"
 
 [project]
-name = "pact"
+name = "real-time-bp"
 version = "0.0.1"
 description = "A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation and Monitoring"
 authors = [
@@ -33,13 +33,12 @@ requires-python = "~=3.12.0"
 
 [tool.ruff]
 line-length = 99
-src = ["pact"]
-include = ["pyproject.toml", "pact/**/*.py"]
+src = ["real_time_bp"]
+include = ["pyproject.toml", "real_time_bp/**/*.py"]
 
 [tool.ruff.lint]
 extend-select = ["I"]  # Add import sorting
 
 [tool.ruff.lint.isort]
-known-first-party = ["pact"]
+known-first-party = ["real_time_bp"]
 force-sort-within-sections = true
-
