@@ -1,0 +1,8 @@
+method,variant,example_realization_idx,rho_over_v_s,fir_len,fit_band_hz,ridge,stopband_weight,pre_bandlimit_hz,block_len,num_valid_samples,field_rel_error,amp_rmse,phase_rmse_rad
+Centered full estimated-window FFT BP,centered_reference,0,1.4130542610142245,,,,,,1024.0,13977,0.3772830665111542,0.2263791561126709,0.31831032037734985
+Centered true-intensity scintillation-window FFT BP,centered_reference,0,1.4130542610142245,,,,,,1024.0,13977,0.37647682428359985,0.22537559270858765,0.31833314895629883
+Causal Stopband LS-FIR w=0.2 + pre-bandlimit,stopband_weight_0p2_ridge_1e-3_prebandlimited,0,1.4130542610142245,512.0,2.0,0.001,0.2,2.0,,13977,0.6857858300209045,0.5091686248779297,0.8921873569488525
+Causal Stopband-suppressed LS-FIR w=0.2,stopband_weight_0p2_ridge_1e-3,0,1.4130542610142245,512.0,2.0,0.001,0.2,,,13977,0.6868099570274353,0.5085518956184387,0.8943801522254944
+Causal Stopband-suppressed LS-FIR w=1,stopband_weight_1_ridge_1e-2,0,1.4130542610142245,512.0,2.0,0.01,1.0,,,13977,0.6900166869163513,0.5119192004203796,0.9017557501792908
+Causal Passband LS-FIR ridge=1e-2,passband_only_ridge_1e-2,0,1.4130542610142245,512.0,2.0,0.01,0.0,,,13977,11.67096996307373,10.794702529907227,1.7683149576187134
+Causal Passband LS-FIR ridge=1e-6,passband_only_ridge_1e-6,0,1.4130542610142245,512.0,2.0,1e-06,0.0,,,13977,883.8237915039062,882.9375610351562,1.8089656829833984
