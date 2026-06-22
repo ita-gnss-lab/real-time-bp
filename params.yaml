@@ -1,0 +1,111 @@
+dataset:
+  handle: rodrigodlf/backpropagation
+  output_dir: data/raw/backpropagation
+  force_download: false
+
+runtime:
+  csv_chunksize: 75000
+  csv_write_batch_rows: 50000
+  # One process-pool size shared by TVD, filter-bank, and near-real-time stages.
+  parallel_workers: 12
+
+constants:
+  speed_of_light_m_s: 299792458.0
+  gps_l1_hz: 1575420000.0
+
+experiments:
+  # Paper: Results Section III.1; the dataset is stratified
+  # by scintillation severity and carrier-to-noise ratio.
+  severities:
+    - weak
+    - moderate
+    - strong
+  # Paper: Methodology Section II.4; N_init is the initial
+  # segment used both to estimate T_F and to fit the VAR model.
+  n_init_samples: 4096
+  # Paper: Results Section III.2; this sweep justifies the fixed
+  # N_init used in the remaining filter-bank/near-real-time experiments.
+  n_init_sweep_samples:
+    - 512
+    - 1024
+    - 1536
+    - 2048
+    - 3072
+    - 4096
+    - 5120
+    - 6144
+    - 7168
+    - 8192
+    - 9216
+    - 10240
+    - 11264
+    - 12288
+  # Paper: Methodology Section II.4; candidate grid
+  # T={T_F,1,...,T_F,P}, using the 0.5--2.0 s domain from the dataset design.
+  tf_candidate_min_s: 0.5
+  tf_candidate_max_s: 2.0
+  tf_candidate_count: 36
+  # Paper: Results Section III.1; residual Doppler sensitivity now spans the
+  # direct Delta f_D range used in the figures.
+  residual_doppler_error_hz_min: 0.0
+  residual_doppler_error_hz_max: 20.0
+  residual_doppler_error_count: 21
+  representative_c_n0_db_hz: 55.0
+
+tvd:
+  # Paper: Methodology Section II.2; TVD jumps are allowed only
+  # at local fade minima below this intensity threshold.
+  fade_threshold_db: -15.0
+  # Paper: Breitsch-style weighted TVD: low penalty at allowed fade minima.
+  allowed_jump_weight: 1.0
+  # Paper: Breitsch-style weighted TVD: high penalty elsewhere.
+  blocked_jump_weight: 10000.0
+
+near_real_time:
+  # Paper: Methodology Section II.5; VAR order is selected by BIC over
+  # this range for the real/imaginary scintillation features.
+  var_order_min: 1
+  var_order_max: 24
+  # Paper: Results Section III.3, Figure 11; triangular heatmap over
+  # FFT length M and latency L.
+  fft_m_values:
+    - 512
+    - 768
+    - 1024
+    - 1536
+    - 2048
+    - 3072
+    - 4096
+    - 6144
+    - 8192
+  # Paper: Figure 11 varies L from 0 to M-M_c-1. Fractions compare latency
+  # across different M without mixing incompatible absolute sample counts.
+  heatmap_latency_fractions:
+    - 0.0
+    - 0.03125
+    - 0.0625
+    - 0.125
+    - 0.25
+    - 0.5
+    - 0.75
+    - 1.0
+  # Paper: Figure 11 is an aggregate diagnostic; this many evenly spaced
+  # time samples are evaluated per M/L cell to keep the DVC stage tractable.
+  heatmap_eval_samples: 128
+  # Paper: Results Section III.3, Figure 12; practical operating
+  # point used for the batch vs near-real-time comparison.
+  practical_fft_m: 8192
+  practical_latency_samples: 4095
+  heatmap_max_cases_per_severity: 1
+  example_context_samples: 160
+  example_ml_configs:
+    - block_len: 2048
+      latency_samples: 0
+    - block_len: 4096
+      latency_samples: 1024
+    - block_len: 8192
+      latency_samples: 4095
+
+plots:
+  csv_dir: results/csv
+  figures_dir: results/figures

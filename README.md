@@ -63,8 +63,25 @@ A Physics-Aware Carrier Tracking System for Ionospheric Scintillation Mitigation
 
 Use
 ```bash
-uv sync
+sudo apt update
+sudo apt install -y build-essential libblas-dev liblapack-dev liblapacke-dev
 git submodule update --init --recursive
+uv sync
 ```
 to install all dependencies.
 
+## Reproduce Results
+
+The paper pipeline is managed with DVC. It downloads the Kaggle dataset into
+`data/raw/backpropagation`, generates tidy CSV result tables under `results/csv`,
+and renders paper figures as PDFs under `results/figures`.
+
+```bash
+uv run python -m real_time_bp.main
+```
+
+This is equivalent to:
+
+```bash
+uv run dvc repro
+```

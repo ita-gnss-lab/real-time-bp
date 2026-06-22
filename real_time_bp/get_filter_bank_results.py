@@ -1,0 +1,607 @@
+from __future__ import annotations
+
+from loguru import logger
+import numpy as np
+import pandas as pd
+
+from real_time_bp.methodology.backpropagation import (
+    batch_backpropagate,
+    median_align_phase,
+    unwrap_phase,
+)
+from real_time_bp.methodology.filter_bank import (
+    AMPLITUDE_SCORE_NAME,
+    SCORE_NAMES,
+    compute_filter_bank_scores,
+    select_fresnel_time_estimates,
+)
+from real_time_bp.methodology.metrics import (
+    cycle_slips_per_minute,
+    mae,
+    mape,
+    phase_rmse_rad,
+    r2_score,
+    rmse,
+)
+from real_time_bp.methodology.signal_model import (
+    estimate_sample_interval_s,
+    estimated_scintillation_phase_rad,
+    estimated_scintillation_signal,
+    true_refractive_phase_rad,
+    true_scintillation_phase_rad,
+)
+from real_time_bp.representatives import (
+    SEVERITY_ORDER,
+    load_representative_case_ids,
+    severity_groups,
+)
+from real_time_bp.stage_utils import (
+    csv_chunksize_from_params,
+    csv_stage_dir,
+    l1_wavelength_from_params,
+    optional_int,
+    parallel_workers_from_params,
+    residual_doppler_grid_hz,
+    tf_candidate_grid,
+    write_csv,
+)
+from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
+from real_time_bp.utils.parallel import ordered_parallel_map
+from real_time_bp.utils.params import load_params
+from real_time_bp.utils.progress import configure_logging, progress_iter
+
+FILTER_BANK_TRACKING_COLUMNS = {
+    "carrier_phase_est_m",
+    "los_phase_m",
+    "scint_phase_m",
+    "time_sec",
+    "tracked_intensity",
+    "true_refractive_phase_m",
+}
+
+
+def main() -> None:
+    configure_logging()
+    logger.info("Starting filter-bank results stage")
+    params = load_params()
+    experiments = params.get("experiments", {})
+    out_dir = csv_stage_dir("03_filter_bank")
+    paths = find_dataset_paths(params)
+    logger.info("Using dataset root {}", paths.root)
+    wavelength_m = l1_wavelength_from_params(params)
+    candidates = tf_candidate_grid(params)
+    score_n_init_samples = _n_init_sweep_samples(experiments)
+    representative_case_ids = set(load_representative_case_ids().values())
+    max_cases = optional_int(experiments.get("max_cases_per_condition"))
+    chunksize = csv_chunksize_from_params(params)
+    workers = parallel_workers_from_params(params)
+    logger.info("Using {} parallel worker(s)", workers)
+    # Paper: Results Section III.2. This stage generates separate CSVs for the
+    # amplitude score curve, T_F estimates, downstream phase metrics, N_init
+    # sensitivity, and residual-Doppler sensitivity.
+    total_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+    )
+
+    score_rows: list[dict] = []
+    estimate_rows: list[dict] = []
+    downstream_rows: list[dict] = []
+    representative_trace_rows: list[dict] = []
+
+    case_iter = iter_case_dataframes(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+        chunksize=chunksize,
+        columns=FILTER_BANK_TRACKING_COLUMNS,
+    )
+    task_iter = _iter_filter_bank_tasks(
+        case_iter,
+        params,
+        candidates,
+        wavelength_m,
+        residual_doppler_error_hz=0.0,
+        n_init=int(experiments.get("n_init_samples", 4096)),
+        score_n_init_samples=score_n_init_samples,
+        include_representative_traces=True,
+        experiments=experiments,
+        representative_case_ids=representative_case_ids,
+    )
+    result_iter = ordered_parallel_map(
+        _compute_case_filter_bank_task,
+        task_iter,
+        workers=workers,
+    )
+    for result in progress_iter(
+        result_iter,
+        desc="filter-bank cases",
+        total=total_cases,
+        unit="case",
+    ):
+        score_rows.extend(result["score_rows"])
+        estimate_rows.extend(result["estimate_rows"])
+        downstream_rows.extend(result["downstream_rows"])
+        representative_trace_rows.extend(result["trace_rows"])
+
+    write_csv(
+        _sort_by_severity(
+            pd.DataFrame(score_rows),
+            ["tracking_case_id", "n_init_samples", "fresnel_time_candidate_s"],
+        ),
+        out_dir / "filter_bank_score_curves.csv",
+    )
+    estimates_df = _sort_by_severity(pd.DataFrame(estimate_rows), ["tracking_case_id"])
+    write_csv(estimates_df, out_dir / "filter_bank_estimates.csv")
+    downstream_df = _sort_by_severity(pd.DataFrame(downstream_rows), ["tracking_case_id"])
+    write_csv(downstream_df, out_dir / "filter_bank_downstream_phase_metrics.csv")
+    write_csv(
+        _sort_by_severity(
+            pd.DataFrame(representative_trace_rows),
+            ["tracking_case_id", "sample_index"],
+        ),
+        out_dir / "filter_bank_representative_phase_traces.csv",
+    )
+    write_csv(_aggregate_tf_error_metrics(estimates_df), out_dir / "filter_bank_tf_error_metrics.csv")
+    write_csv(_aggregate_downstream_metrics(downstream_df), out_dir / "filter_bank_downstream_summary.csv")
+    write_csv(
+        _compute_n_init_sensitivity(params, paths, candidates, wavelength_m),
+        out_dir / "filter_bank_n_init_sensitivity.csv",
+    )
+    write_csv(
+        _compute_residual_doppler_sensitivity(params, paths, candidates, wavelength_m),
+        out_dir / "filter_bank_residual_doppler_sensitivity.csv",
+    )
+    logger.info("Finished filter-bank results stage")
+
+
+def _compute_case_filter_bank(
+    metadata: dict,
+    case_df: pd.DataFrame,
+    params: dict,
+    candidates: np.ndarray,
+    wavelength_m: float,
+    residual_doppler_error_hz: float,
+    n_init: int,
+    score_n_init_samples: list[int] | None = None,
+    include_trace: bool = False,
+) -> dict[str, list[dict]]:
+    sample_interval_s = estimate_sample_interval_s(case_df)
+    n_init = min(int(n_init), len(case_df))
+    # Paper: Methodology Eq. (13); the
+    # filter bank always operates on the estimated complex scintillation signal.
+    signal = estimated_scintillation_signal(case_df, wavelength_m, residual_doppler_error_hz)
+    estimated_scintillation_phase = estimated_scintillation_phase_rad(
+        case_df,
+        wavelength_m,
+        residual_doppler_error_hz,
+    )
+    true_scintillation_phase = true_scintillation_phase_rad(case_df, wavelength_m)
+    true_phase = true_refractive_phase_rad(case_df, wavelength_m)
+    init_signal = signal[:n_init]
+    # Paper: Methodology Section II.4. Only the first N_init
+    # samples are used to score each candidate T_F.
+    score_curves = compute_filter_bank_scores(
+        init_signal,
+        sample_interval_s,
+        candidates,
+    )
+    estimates = select_fresnel_time_estimates(candidates, score_curves)
+    true_tf = float(metadata.get("rhof_veff_ratio", np.nan))
+    base = _case_keys(metadata)
+    base.update(
+        {
+            "n_init_samples": n_init,
+            "sample_interval_s": sample_interval_s,
+            "residual_doppler_error_hz": float(residual_doppler_error_hz),
+        }
+    )
+
+    score_rows = []
+    score_curve_by_n_init = {int(n_init): score_curves}
+    if include_trace:
+        for score_n_init in score_n_init_samples or [n_init]:
+            score_n_init = min(int(score_n_init), len(case_df))
+            if score_n_init in score_curve_by_n_init:
+                continue
+            score_curve_by_n_init[score_n_init] = compute_filter_bank_scores(
+                signal[:score_n_init],
+                sample_interval_s,
+                candidates,
+            )
+    for score_n_init, score_curve in sorted(score_curve_by_n_init.items()):
+        for i, candidate in enumerate(candidates):
+            # Paper: Figure 2 needs every candidate value for the amplitude
+            # score, including the N_init sweep for representative examples.
+            row = {
+                **base,
+                "true_fresnel_time_scale_s": true_tf,
+                "n_init_samples": int(score_n_init),
+                "candidate_index": i,
+                "fresnel_time_candidate_s": float(candidate),
+            }
+            for score_name in SCORE_NAMES:
+                row[score_name] = float(score_curve[score_name][i])
+            score_rows.append(row)
+
+    estimate_rows = []
+    downstream_rows = []
+    trace_rows = []
+    estimated_tf = estimates[AMPLITUDE_SCORE_NAME]
+    # Paper: Figure 3 and the Section III.2 metrics table use these rows
+    # for MAE, MAPE, RMSE_TF, R^2_TF, and worst-case diagnostics.
+    estimate_rows.append(
+        {
+            **base,
+            "true_fresnel_time_scale_s": true_tf,
+            "estimated_fresnel_time_scale_s": estimated_tf,
+            "fresnel_time_error_s": estimated_tf - true_tf if np.isfinite(true_tf) else np.nan,
+            "fresnel_time_abs_error_s": abs(estimated_tf - true_tf) if np.isfinite(true_tf) else np.nan,
+            "selected_candidate_index": int(np.nanargmin(score_curves[AMPLITUDE_SCORE_NAME])),
+        }
+    )
+    # Paper: Results downstream metrics. After estimating T_F, run batch BP
+    # over the full case and compare the recovered screen phase to truth.
+    backpropagated = batch_backpropagate(signal, sample_interval_s, estimated_tf)
+    phase = median_align_phase(unwrap_phase(backpropagated), true_phase, n_init)
+    phase_rmse = phase_rmse_rad(true_phase[n_init:], phase[n_init:])
+    slip_count, slips_per_min = cycle_slips_per_minute(
+        true_phase,
+        phase,
+        sample_interval_s,
+        start_index=n_init,
+    )
+    downstream_rows.append(
+        {
+            **base,
+            "true_fresnel_time_scale_s": true_tf,
+            "estimated_fresnel_time_scale_s": estimated_tf,
+            "phase_rmse_rad": phase_rmse,
+            "cycle_slip_count": slip_count,
+            "cycle_slips_per_minute": slips_per_min,
+        }
+    )
+    if include_trace:
+        # Paper: Figure 5 uses the amplitude-only baseline from Section II.4
+        # for representative phase-retrieval traces.
+        stride = max(len(case_df) // 2500, 1)
+        for idx in range(0, len(case_df), stride):
+            trace_rows.append(
+                {
+                    **base,
+                    "sample_index": int(idx),
+                    "time_sec": float(case_df["time_sec"].iloc[idx]),
+                    "true_scintillation_phase_rad": float(true_scintillation_phase[idx]),
+                    "estimated_scintillation_phase_rad": float(estimated_scintillation_phase[idx]),
+                    "true_refractive_phase_rad": float(true_phase[idx]),
+                    "backpropagated_refractive_phase_rad": float(phase[idx]),
+                    "backpropagated_phase_rad": float(phase[idx]),
+                    "true_scintillation_minus_refractive_rad": float(
+                        true_scintillation_phase[idx] - true_phase[idx]
+                    ),
+                    "estimated_scintillation_minus_refractive_rad": float(
+                        estimated_scintillation_phase[idx] - true_phase[idx]
+                    ),
+                    "phase_error_rad": float(phase[idx] - true_phase[idx]),
+                }
+            )
+    return {
+        "score_rows": score_rows,
+        "estimate_rows": estimate_rows,
+        "downstream_rows": downstream_rows,
+        "trace_rows": trace_rows,
+    }
+
+
+def _iter_filter_bank_tasks(
+    case_iter,
+    params: dict,
+    candidates: np.ndarray,
+    wavelength_m: float,
+    *,
+    residual_doppler_error_hz: float,
+    n_init: int,
+    score_n_init_samples: list[int] | None = None,
+    include_representative_traces: bool = False,
+    experiments: dict | None = None,
+    representative_case_ids: set[int] | None = None,
+):
+    traced_severities: set[str] = set()
+    experiments = experiments or {}
+    representative_case_ids = representative_case_ids or set()
+    for metadata, case_df in case_iter:
+        severity = str(metadata.get("severity"))
+        case_id = int(metadata.get("tracking_case_id", 0) or 0)
+        # Paper: Figure 2 representative score curves are one per severity at the
+        # configured carrier-to-noise ratio, while metrics use all cases.
+        include_trace = include_representative_traces and (
+            case_id in representative_case_ids
+            or (
+                not representative_case_ids
+                and _is_representative_case(metadata, experiments)
+                and severity not in traced_severities
+            )
+        )
+        if include_trace:
+            traced_severities.add(severity)
+        yield (
+            metadata,
+            case_df,
+            params,
+            candidates,
+            wavelength_m,
+            residual_doppler_error_hz,
+            n_init,
+            score_n_init_samples,
+            include_trace,
+        )
+
+
+def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]]:
+    (
+        metadata,
+        case_df,
+        params,
+        candidates,
+        wavelength_m,
+        residual_doppler_error_hz,
+        n_init,
+        score_n_init_samples,
+        include_trace,
+    ) = task
+    return _compute_case_filter_bank(
+        metadata,
+        case_df,
+        params,
+        candidates,
+        float(wavelength_m),
+        residual_doppler_error_hz=float(residual_doppler_error_hz),
+        n_init=int(n_init),
+        score_n_init_samples=score_n_init_samples,
+        include_trace=bool(include_trace),
+    )
+
+
+def _compute_n_init_sensitivity(
+    params: dict,
+    paths,
+    candidates: np.ndarray,
+    wavelength_m: float,
+) -> pd.DataFrame:
+    experiments = params.get("experiments", {})
+    rows: list[dict] = []
+    max_cases = optional_int(experiments.get("n_init_sweep_max_cases_per_condition"))
+    chunksize = csv_chunksize_from_params(params)
+    workers = parallel_workers_from_params(params)
+    for n_init in experiments.get("n_init_sweep_samples", [4096]):
+        logger.info("Computing N_init sensitivity for N_init={}", n_init)
+        # Paper: Figure 4; sweep N_init to justify the
+        # fixed initialization length used elsewhere.
+        estimate_rows: list[dict] = []
+        downstream_rows: list[dict] = []
+        case_iter = iter_case_dataframes(
+            paths,
+            severities=experiments.get("severities"),
+            max_cases_per_condition=max_cases,
+            chunksize=chunksize,
+            columns=FILTER_BANK_TRACKING_COLUMNS,
+        )
+        task_iter = _iter_filter_bank_tasks(
+            case_iter,
+            params,
+            candidates,
+            wavelength_m,
+            residual_doppler_error_hz=0.0,
+            n_init=int(n_init),
+            score_n_init_samples=None,
+        )
+        result_iter = ordered_parallel_map(
+            _compute_case_filter_bank_task,
+            task_iter,
+            workers=workers,
+        )
+        total_cases = count_cases(
+            paths,
+            severities=experiments.get("severities"),
+            max_cases_per_condition=max_cases,
+        )
+        for result in progress_iter(
+            result_iter,
+            desc=f"N_init={n_init} cases",
+            total=total_cases,
+            unit="case",
+        ):
+            estimate_rows.extend(result["estimate_rows"])
+            downstream_rows.extend(result["downstream_rows"])
+        estimates = pd.DataFrame(estimate_rows)
+        downstream = pd.DataFrame(downstream_rows)
+        if estimates.empty:
+            continue
+        for severity, group in severity_groups(estimates):
+            downstream_group = downstream[downstream["severity"] == severity]
+            rows.append(
+                {
+                    "n_init_samples": int(n_init),
+                    "severity": severity,
+                    "rmse_fresnel_time_scale_s": rmse(group["fresnel_time_error_s"].to_numpy()),
+                    "r2_fresnel_time_scale": r2_score(
+                        group["true_fresnel_time_scale_s"].to_numpy(),
+                        group["estimated_fresnel_time_scale_s"].to_numpy(),
+                    ),
+                    "mean_cycle_slips_per_minute": float(
+                        downstream_group["cycle_slips_per_minute"].mean()
+                    )
+                    if not downstream_group.empty
+                    else np.nan,
+                }
+            )
+    return _sort_by_severity(pd.DataFrame(rows), ["n_init_samples"])
+
+
+def _compute_residual_doppler_sensitivity(
+    params: dict,
+    paths,
+    candidates: np.ndarray,
+    wavelength_m: float,
+) -> pd.DataFrame:
+    experiments = params.get("experiments", {})
+    rows: list[dict] = []
+    max_cases = optional_int(experiments.get("residual_max_cases_per_condition"))
+    chunksize = csv_chunksize_from_params(params)
+    workers = parallel_workers_from_params(params)
+    residual_grid = residual_doppler_grid_hz(params)
+    n_init_values = _residual_n_init_samples(experiments)
+    for n_init in n_init_values:
+        logger.info("Computing residual Doppler sensitivity for N_init={}", n_init)
+        for _, residual_row in residual_grid.iterrows():
+            # Paper: Figure 6; inject a known residual Doppler term to quantify
+            # sensitivity to imperfect LOS cleanup.
+            logger.info(
+                "Computing residual Doppler sensitivity for {:.4f} m/s ({:.4f} Hz)",
+                float(residual_row["residual_geometric_error_mps"]),
+                float(residual_row["residual_doppler_error_hz"]),
+            )
+            estimate_rows: list[dict] = []
+            case_iter = iter_case_dataframes(
+                paths,
+                severities=experiments.get("severities"),
+                max_cases_per_condition=max_cases,
+                chunksize=chunksize,
+                columns=FILTER_BANK_TRACKING_COLUMNS,
+            )
+            task_iter = _iter_filter_bank_tasks(
+                case_iter,
+                params,
+                candidates,
+                wavelength_m,
+                residual_doppler_error_hz=float(residual_row["residual_doppler_error_hz"]),
+                n_init=int(n_init),
+                score_n_init_samples=None,
+            )
+            result_iter = ordered_parallel_map(
+                _compute_case_filter_bank_task,
+                task_iter,
+                workers=workers,
+            )
+            total_cases = count_cases(
+                paths,
+                severities=experiments.get("severities"),
+                max_cases_per_condition=max_cases,
+            )
+            for result in progress_iter(
+                result_iter,
+                desc=f"N_init={n_init}, residual {float(residual_row['residual_doppler_error_hz']):.2f} Hz",
+                total=total_cases,
+                unit="case",
+            ):
+                estimate_rows.extend(result["estimate_rows"])
+            estimates = pd.DataFrame(estimate_rows)
+            if estimates.empty:
+                continue
+            for severity, group in severity_groups(estimates):
+                rows.append(
+                    {
+                        "n_init_samples": int(n_init),
+                        "residual_geometric_error_mps": float(residual_row["residual_geometric_error_mps"]),
+                        "residual_doppler_error_hz": float(residual_row["residual_doppler_error_hz"]),
+                        "severity": severity,
+                        "rmse_fresnel_time_scale_s": rmse(group["fresnel_time_error_s"].to_numpy()),
+                        "r2_fresnel_time_scale": r2_score(
+                            group["true_fresnel_time_scale_s"].to_numpy(),
+                            group["estimated_fresnel_time_scale_s"].to_numpy(),
+                        ),
+                    }
+                )
+    return _sort_by_severity(
+        pd.DataFrame(rows),
+        ["n_init_samples", "residual_doppler_error_hz"],
+    )
+
+
+def _n_init_sweep_samples(experiments: dict) -> list[int]:
+    values = sorted({int(value) for value in experiments.get("n_init_sweep_samples", [4096])})
+    return values or [int(experiments.get("n_init_samples", 4096))]
+
+
+def _residual_n_init_samples(experiments: dict) -> list[int]:
+    values = _n_init_sweep_samples(experiments)
+    return sorted({values[0], values[len(values) // 2], values[-1]})
+
+
+def _aggregate_tf_error_metrics(estimates: pd.DataFrame) -> pd.DataFrame:
+    if estimates.empty:
+        return pd.DataFrame()
+    rows = []
+    for severity, group in severity_groups(estimates):
+        rows.append(
+            {
+                "severity": severity,
+                "mae_fresnel_time_scale_s": mae(group["fresnel_time_error_s"].to_numpy()),
+                "mape_fresnel_time_scale_pct": mape(
+                    group["true_fresnel_time_scale_s"].to_numpy(),
+                    group["estimated_fresnel_time_scale_s"].to_numpy(),
+                ),
+                "rmse_fresnel_time_scale_s": rmse(group["fresnel_time_error_s"].to_numpy()),
+                "r2_fresnel_time_scale": r2_score(
+                    group["true_fresnel_time_scale_s"].to_numpy(),
+                    group["estimated_fresnel_time_scale_s"].to_numpy(),
+                ),
+                "n_cases": int(group.shape[0]),
+            }
+        )
+    return _sort_by_severity(pd.DataFrame(rows), [])
+
+
+def _aggregate_downstream_metrics(downstream: pd.DataFrame) -> pd.DataFrame:
+    if downstream.empty:
+        return pd.DataFrame()
+    summary = (
+        downstream.groupby("severity", dropna=False)
+        .agg(
+            mean_phase_rmse_rad=("phase_rmse_rad", "mean"),
+            mean_cycle_slips_per_minute=("cycle_slips_per_minute", "mean"),
+            n_cases=("phase_rmse_rad", "size"),
+        )
+        .reset_index()
+    )
+    return _sort_by_severity(summary, [])
+
+
+def _sort_by_severity(df: pd.DataFrame, extra_columns: list[str]) -> pd.DataFrame:
+    if df.empty or "severity" not in df.columns:
+        return df
+    ordered = pd.Categorical(df["severity"].astype(str), categories=SEVERITY_ORDER, ordered=True)
+    sort_columns = [
+        column
+        for column in ["_severity_order", *extra_columns]
+        if column == "_severity_order" or column in df.columns
+    ]
+    return (
+        df.assign(_severity_order=ordered)
+        .sort_values(sort_columns)
+        .drop(columns="_severity_order")
+    )
+
+
+def _is_representative_case(metadata: dict, experiments: dict) -> bool:
+    c_n0 = metadata.get("input_c_n0_db_hz")
+    target_c_n0 = experiments.get("representative_c_n0_db_hz", 30.0)
+    return bool(np.isfinite(c_n0) and abs(float(c_n0) - float(target_c_n0)) < 1e-9)
+
+
+def _case_keys(metadata: dict) -> dict:
+    return {
+        "tracking_case_id": metadata.get("tracking_case_id"),
+        "example_idx": metadata.get("example_idx"),
+        "c_n0_idx": metadata.get("c_n0_idx"),
+        "severity": metadata.get("severity"),
+        "frequency": metadata.get("frequency"),
+        "svid": metadata.get("svid"),
+        "input_c_n0_db_hz": metadata.get("input_c_n0_db_hz"),
+        "init_doppler_error_hz": metadata.get("init_doppler_error_hz"),
+    }
+
+
+if __name__ == "__main__":
+    main()
