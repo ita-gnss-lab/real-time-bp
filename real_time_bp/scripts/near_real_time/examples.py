@@ -50,6 +50,7 @@ def phase_example_rows(
     tvd_cfg = params.get("tvd", {})
     configs = _example_ml_configs(near_cfg)
     plot_indices = np.fromiter(sample_indices(len(case_df)), dtype=int)
+    n_init = int(params.get("experiments", {}).get("n_init_samples", 4096))
     intensity_db = detrended_intensity_db(case_df)
     batch_phase_error = batch_phase - true_phase
     batch_integer_cycle_bias = tvd_integer_bias(
@@ -75,7 +76,7 @@ def phase_example_rows(
         phase = median_align_phase(
             unwrap_phase(sliding),
             true_phase,
-            int(params.get("experiments", {}).get("n_init_samples", 4096)),
+            n_init,
         )
         phase_error = phase - true_phase
         integer_cycle_bias = _finite_tvd_integer_bias(
@@ -96,6 +97,7 @@ def phase_example_rows(
                     "configuration": configuration,
                     "block_len": int(block_len),
                     "latency_samples": int(latency),
+                    "n_init_samples": int(n_init),
                 },
                 lambda idx: {
                     "intensity_db": float(intensity_db[idx]),

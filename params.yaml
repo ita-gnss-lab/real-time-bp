@@ -24,16 +24,24 @@ experiments:
   n_init_samples: 4096
   # Paper: Results Section III.2; this sweep justifies the fixed
   # N_init used in the remaining filter-bank/near-real-time experiments.
-  # TODO: Make a linear grid again, that vary until 600 seconds * T. I will regenerate the dataset with a larger time span.
-  # TODO: Define a explicit n_init_samples_boxplot to be used in the boxplot figure. Use the highest possible value of n_init_samples in this n_init_samples_boxplot. 
-  # TODO: Include a header in the legend of the boxplot figure with the value of N_init as `n_init_samples_boxplot`.
   n_init_sweep_samples:
     - 512
     - 1024
     - 1536
     - 2048
+    - 2560
+    - 3072
+    - 3584
     - 4096
+    - 4608
+    - 5120
+    - 5632
+    - 6144
+    - 6656
+    - 7168
+    - 7680
     - 8192
+  n_init_samples_boxplot: 8192
   # Paper: Methodology Section II.4; candidate grid
   # T={T_F,1,...,T_F,P}, using the 0.5--2.0 s domain from the dataset design.
   tf_candidate_min_s: 0.5
@@ -46,6 +54,9 @@ experiments:
     - 4096
   # C/N0 used to choose representative examples for figures.
   representative_c_n0_db_hz: 35.0
+  representative_case_rank_by_severity:
+    weak: 0
+    strong: 0
 
 tvd:
   # Paper: Methodology Section II.2; TVD jumps are allowed only
@@ -94,6 +105,8 @@ near_real_time:
   residual_doppler_error_hz_min: 0.0
   residual_doppler_error_hz_max: 0.6
   residual_doppler_error_count: 16
+  var_test_alpha: 0.05
+  var_whiteness_test_lags: 24
   heatmap_max_cases_per_severity: 1
   forecast_example_c_n0_db_hz: 35.0
   example_ml_configs:
@@ -105,3 +118,6 @@ near_real_time:
 plots:
   csv_dir: results/csv
   figures_dir: results/figures
+  forecast_zoom_start_s: 70.0
+  forecast_zoom_end_s: 80.0
+  forecast_zoom_latency_samples: 0

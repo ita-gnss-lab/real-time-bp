@@ -5,7 +5,10 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from real_time_bp.methodology.near_real_time import select_var_order_bic
+from real_time_bp.methodology.near_real_time import (
+    select_var_order_bic,
+    var_residual_test_summary,
+)
 from real_time_bp.methodology.signal_model import estimated_scintillation_signal
 from real_time_bp.scripts.near_real_time.common import (
     NEAR_REAL_TIME_TRACKING_COLUMNS,
@@ -126,6 +129,11 @@ def compute_var_residual_diagnostics(
             int(near_cfg.get("var_order_min", 1)),
             int(near_cfg.get("var_order_max", 24)),
         )
+        test_summary = var_residual_test_summary(
+            var_result,
+            alpha=float(near_cfg.get("var_test_alpha", 0.05)),
+            whiteness_lags=int(near_cfg.get("var_whiteness_test_lags", 24)),
+        )
         residuals = np.asarray(var_result.resid, dtype=float)
         start_sample = int(var_result.k_ar)
         for component_idx, component in enumerate(["real", "imag"]):
@@ -141,9 +149,11 @@ def compute_var_residual_diagnostics(
                         **case_keys(metadata),
                         "component": component,
                         "diagnostic": "residual",
+                        "n_init_samples": int(n_init),
                         "sample_index": int(sample_index),
                         "time_sec": float(case_df["time_sec"].iloc[sample_index]),
                         "value": float(value),
+                        **test_summary,
                     }
                 )
     return pd.DataFrame(rows)

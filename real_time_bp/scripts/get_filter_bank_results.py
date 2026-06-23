@@ -71,6 +71,7 @@ REPRESENTATIVE_TRACES_CSV = "filter_bank_representative_phase_traces.csv"
 TF_ERROR_METRICS_CSV = "filter_bank_tf_error_metrics.csv"
 DOWNSTREAM_SUMMARY_CSV = "filter_bank_downstream_summary.csv"
 N_INIT_SENSITIVITY_CSV = "filter_bank_n_init_sensitivity.csv"
+BOXPLOT_ESTIMATES_CSV = "filter_bank_boxplot_estimates.csv"
 RESIDUAL_DOPPLER_SENSITIVITY_CSV = "filter_bank_residual_doppler_sensitivity.csv"
 
 
@@ -162,6 +163,10 @@ def main() -> None:
     write_csv(
         _compute_n_init_sensitivity(params, paths, candidates, wavelength_m),
         out_dir / N_INIT_SENSITIVITY_CSV,
+    )
+    write_csv(
+        _compute_boxplot_estimates(params, paths, candidates, wavelength_m),
+        out_dir / BOXPLOT_ESTIMATES_CSV,
     )
     stale_residual_csv = out_dir / RESIDUAL_DOPPLER_SENSITIVITY_CSV
     if stale_residual_csv.exists():
@@ -485,6 +490,62 @@ def _compute_n_init_sensitivity(
                 }
             )
     return sort_by_severity(pd.DataFrame(rows), ["n_init_samples"])
+
+
+def _compute_boxplot_estimates(
+    params: dict,
+    paths,
+    candidates: np.ndarray,
+    wavelength_m: float,
+) -> pd.DataFrame:
+    """Compute per-case T_F estimates for the boxplot N_init setting.
+
+    Main paper:
+        Results Figure 4 uses the largest configured N_init in the boxplot
+        column so the T_F estimate distribution is shown for the strongest
+        initialization evidence available in the regenerated dataset.
+    """
+    experiments = params.get("experiments", {})
+    n_init = int(
+        experiments.get("n_init_samples_boxplot", experiments.get("n_init_samples", 4096))
+    )
+    chunksize = csv_chunksize_from_params(params)
+    workers = parallel_workers_from_params(params)
+    case_iter = iter_case_dataframes(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=optional_int(experiments.get("max_cases_per_condition")),
+        chunksize=chunksize,
+        columns=FILTER_BANK_TRACKING_COLUMNS,
+    )
+    task_iter = _iter_filter_bank_tasks(
+        case_iter,
+        params,
+        candidates,
+        wavelength_m,
+        residual_doppler_error_hz=0.0,
+        n_init=n_init,
+        score_n_init_samples=None,
+    )
+    result_iter = ordered_parallel_map(
+        _compute_case_filter_bank_task,
+        task_iter,
+        workers=workers,
+    )
+    total_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=optional_int(experiments.get("max_cases_per_condition")),
+    )
+    estimate_rows = []
+    for result in progress_iter(
+        result_iter,
+        desc=f"boxplot N_init={n_init} cases",
+        total=total_cases,
+        unit="case",
+    ):
+        estimate_rows.extend(result["estimate_rows"])
+    return sort_by_severity(pd.DataFrame(estimate_rows), ["tracking_case_id"])
 
 
 def _score_curve_n_init_samples(experiments: dict) -> list[int]:

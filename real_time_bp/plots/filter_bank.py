@@ -16,6 +16,7 @@ from real_time_bp.plots.common import (
     remove_figure,
     save_figure,
 )
+from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import (
     COLORS,
     CONFIG_CMAP,
@@ -38,10 +39,25 @@ def plot_filter_bank() -> None:
     out_dir = figure_stage_dir("03_filter_bank")
     scores = read_csv("03_filter_bank/filter_bank_score_curves.csv")
     estimates = amplitude_only(read_csv("03_filter_bank/filter_bank_estimates.csv"))
+    boxplot_estimates = amplitude_only(
+        read_csv("03_filter_bank/filter_bank_boxplot_estimates.csv")
+    )
     n_init = amplitude_only(read_csv("03_filter_bank/filter_bank_n_init_sensitivity.csv"))
+    params = load_params()
+    n_init_boxplot = int(
+        params.get("experiments", {}).get(
+            "n_init_samples_boxplot",
+            params.get("experiments", {}).get("n_init_samples", 4096),
+        )
+    )
 
     _plot_score_curves(scores, out_dir / "representative_filter_bank_score_curves.pdf")
-    _plot_n_init_sensitivity(n_init, estimates, out_dir / "n_init_sensitivity.pdf")
+    _plot_n_init_sensitivity(
+        n_init,
+        boxplot_estimates if not boxplot_estimates.empty else estimates,
+        out_dir / "n_init_sensitivity.pdf",
+        n_init_boxplot,
+    )
     remove_figure(out_dir / "fresnel_time_error_boxplot.pdf")
     remove_figure(out_dir / "residual_doppler_sensitivity.pdf")
     remove_figure(out_dir / "downstream_phase_metrics.pdf")
@@ -56,19 +72,21 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         Results Figure 2 displays J(T_F) against N_init for representative
         cases. Residual Doppler robustness is not part of this figure.
     """
-    # TODO: Include the legends in a dedicated third column.
     if scores.empty:
         placeholder(path, "No filter-bank score data")
         return
     severities = ordered_severities(scores)
     fig, axes = plt.subplots(
         1,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 1, panel_height_cm=5.7),
+        len(severities) + 1,
+        figsize=grid_figure_size(len(severities) + 1, 1, panel_height_cm=5.7),
         sharey=False,
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.7]},
     )
     axes = np.atleast_1d(axes)
-    for ax, severity in zip(axes, severities):
+    legend_ax = axes[-1]
+    legend_ax.set_axis_off()
+    for ax, severity in zip(axes[:-1], severities):
         group = scores[scores["severity"].eq(severity)]
         if "residual_doppler_error_hz" in group.columns:
             residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
@@ -141,11 +159,13 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
     axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
-    axes[-1].legend()
+    handles, labels = _unique_legend_items(axes[:-1])
+    if handles:
+        legend_ax.legend(handles, labels, loc="center left", frameon=False)
     save_figure(fig, path)
 
 
-def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax) -> None:
+def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax, n_init_samples: int) -> None:
     """Draw estimated T_F boxplots against true CPSSM T_F.
 
     Main paper:
@@ -220,15 +240,22 @@ def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax) -> None:
     ax.set_xticklabels([f"{value:.2f}" for value in centers], rotation=45)
     ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
     ax.set_ylabel(r"$\hat{T}_{\mathrm{F}}$ [s]")
+    ax.set_title(rf"$N_{{\mathrm{{init}}}}={int(n_init_samples)}$")
     ax.legend(
         handles=[
             *legend_handles,
             plt.Line2D([0], [0], color=COLORS["truth"], linestyle="--", label="Identity"),
-        ]
+        ],
+        title=rf"$N_{{\mathrm{{init}}}}={int(n_init_samples)}$",
     )
 
 
-def _plot_n_init_sensitivity(df: pd.DataFrame, estimates: pd.DataFrame, path: Path) -> None:
+def _plot_n_init_sensitivity(
+    df: pd.DataFrame,
+    estimates: pd.DataFrame,
+    path: Path,
+    n_init_boxplot: int,
+) -> None:
     """Plot N_init sensitivity and the T_F estimate distribution.
 
     Main paper:
@@ -267,5 +294,20 @@ def _plot_n_init_sensitivity(df: pd.DataFrame, estimates: pd.DataFrame, path: Pa
     for ax in axes[:2]:
         ax.set_xlabel(r"$N_{\mathrm{init}}$ [samples]")
     axes[1].legend(ncol=1)
-    _draw_tf_error_boxplot(estimates, axes[2])
+    _draw_tf_error_boxplot(estimates, axes[2], n_init_boxplot)
     save_figure(fig, path)
+
+
+def _unique_legend_items(axes) -> tuple[list, list[str]]:
+    handles = []
+    labels = []
+    seen = set()
+    for ax in axes:
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        for handle, label in zip(ax_handles, ax_labels, strict=True):
+            if label in seen:
+                continue
+            seen.add(label)
+            handles.append(handle)
+            labels.append(label)
+    return handles, labels

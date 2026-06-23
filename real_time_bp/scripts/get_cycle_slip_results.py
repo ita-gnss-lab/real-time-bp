@@ -161,7 +161,7 @@ def main() -> None:
         task_iter,
         workers=workers,
     )
-    best_by_severity: dict[str, tuple[tuple[float, ...], dict]] = {}
+    candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]] = {}
     with (
         BufferedCsvWriter(
             out_dir / EVENTS_CSV,
@@ -186,11 +186,9 @@ def main() -> None:
             rank_key = _representative_rank_key(summary_row)
             if rank_key is not None:
                 severity = str(summary_row.get("severity"))
-                current = best_by_severity.get(severity)
-                if current is None or rank_key < current[0]:
-                    best_by_severity[severity] = (rank_key, summary_row)
+                candidates_by_severity.setdefault(severity, []).append((rank_key, summary_row))
 
-    representative_rows = _representative_rows(best_by_severity)
+    representative_rows = _representative_rows(candidates_by_severity, experiments)
     write_csv(
         pd.DataFrame(representative_rows, columns=REPRESENTATIVE_COLUMNS),
         out_dir / REPRESENTATIVES_CSV,
@@ -409,13 +407,17 @@ def _representative_rank_key(summary_row: dict) -> tuple[float, ...] | None:
 
 
 def _representative_rows(
-    best_by_severity: dict[str, tuple[tuple[float, ...], dict]],
+    candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]],
+    experiments: dict,
 ) -> list[dict]:
     rows = []
+    ranks = experiments.get("representative_case_rank_by_severity", {}) or {}
     for severity in SEVERITY_ORDER:
-        if severity not in best_by_severity:
+        candidates = sorted(candidates_by_severity.get(severity, []), key=lambda item: item[0])
+        if not candidates:
             continue
-        row = dict(best_by_severity[severity][1])
+        requested_rank = max(int(ranks.get(severity, 0)), 0)
+        row = dict(candidates[min(requested_rank, len(candidates) - 1)][1])
         row["abs_diffractive_phase_slope_cycles_per_s"] = abs(
             float(row.get("diffractive_phase_slope_cycles_per_s") or 0.0)
         )

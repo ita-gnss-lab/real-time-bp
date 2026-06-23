@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from real_time_bp.plots.common import column, placeholder, read_csv, remove_figure, save_figure
+from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import (
     COLORS,
     CONFIG_CMAP,
@@ -260,7 +261,9 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
                 color="black",
             )
     if metric_image is not None:
-        fig.colorbar(metric_image, ax=axes[0, :], label=r"MRMSE $\hat{\phi}_r$ [rad]", fraction=0.03)
+        fig.colorbar(
+            metric_image, ax=axes[0, :], label=r"MRMSE $\hat{\phi}_r$ [rad]", fraction=0.03
+        )
     if cs_image is not None:
         fig.colorbar(cs_image, ax=axes[1, :], label="CS/min", fraction=0.03)
     save_figure(fig, path, tight=False)
@@ -273,8 +276,6 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         Results Figure 13 compares truth, batch BP, and near-real-time BP for
         representative cases.
     """
-    # TODO: Put the legend as a third dedicated column.
-    # TODO: Put the value o N_init and M in the title of the legend.
     if df.empty:
         placeholder(path, "No phase example data")
         return
@@ -283,11 +284,15 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
     ]
     fig, axes = plt.subplots(
         1,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 1, panel_height_cm=6.0),
+        len(severities) + 1,
+        figsize=grid_figure_size(len(severities) + 1, 1, panel_height_cm=6.0),
         sharex=False,
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.65]},
     )
     axes = np.atleast_1d(axes)
+    legend_ax = axes[-1]
+    legend_ax.set_axis_off()
+    legend_title = None
     for col, severity in enumerate(severities):
         ax = axes[col]
         severity_group = df[df["severity"].astype(str).eq(severity)]
@@ -305,6 +310,19 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
             ax.text(0.5, 0.5, "No M=2048 examples", ha="center", va="center")
             ax.set_axis_off()
             continue
+        n_init_value = (
+            int(severity_group["n_init_samples"].dropna().iloc[0])
+            if "n_init_samples" in severity_group
+            and severity_group["n_init_samples"].notna().any()
+            else None
+        )
+        m_value = (
+            int(severity_group["block_len"].dropna().iloc[0])
+            if "block_len" in severity_group and severity_group["block_len"].notna().any()
+            else None
+        )
+        if legend_title is None and n_init_value is not None and m_value is not None:
+            legend_title = rf"$N_{{\mathrm{{init}}}}={n_init_value}$, $M={m_value}$"
         first_config = (
             severity_group["configuration"].iloc[0] if "configuration" in severity_group else None
         )
@@ -367,7 +385,9 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel("Time [sec]")
         ax.set_ylabel("Phase differences [cycles]")
-    axes[-1].legend(loc="best")
+    handles, labels = _unique_legend_items(axes[:-1])
+    if handles:
+        legend_ax.legend(handles, labels, loc="center left", frameon=False, title=legend_title)
     save_figure(fig, path)
 
 
@@ -378,11 +398,13 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         Results Figure 9 compares true and VAR-forecasted real/imaginary
         scintillation samples for a representative case.
     """
-    # FIXME: The forecast picture is not being plotted anymore.
-    # TODO: Thehe VAR forecast example should be refactored as a 1x2 plot of a zoom between 70 to 80 seconds of a single forecast. Lets include later the start and begining of the zoom in the params.yaml file.
     if df.empty:
         placeholder(path, "No forecast example data")
         return
+    plot_cfg = load_params().get("plots", {})
+    zoom_start_s = float(plot_cfg.get("forecast_zoom_start_s", 70.0))
+    zoom_end_s = float(plot_cfg.get("forecast_zoom_end_s", 80.0))
+    requested_latency = int(plot_cfg.get("forecast_zoom_latency_samples", 0))
     strong = df[df["severity"].astype(str).eq("strong")]
     source = strong if not strong.empty else df
     if "input_c_n0_db_hz" in source:
@@ -397,13 +419,29 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
     group = source[source["tracking_case_id"].eq(case_id)].sort_values(
         ["latency_samples", "sample_index"]
     )
-    group = group[pd.to_numeric(group["latency_samples"], errors="coerce").isin([0, 1024, 2048])]
+    latencies = sorted(pd.to_numeric(group["latency_samples"], errors="coerce").dropna().unique())
+    if not latencies:
+        placeholder(path, "No forecast latency data")
+        return
+    selected_latency = requested_latency if requested_latency in latencies else int(latencies[0])
+    group = group[pd.to_numeric(group["latency_samples"], errors="coerce").eq(selected_latency)]
     if group.empty:
-        placeholder(path, "Regenerate forecast CSVs for L=0, 1024, 2048")
+        placeholder(path, f"No forecast CSV rows for L={selected_latency}")
         return
     truth = group.drop_duplicates("sample_index").sort_values("sample_index")
-    fig, axes = plt.subplots(2, 1, figsize=figure_size("two_row"), sharex=True)
     x_col = "time_sec" if "time_sec" in truth.columns else "sample_index"
+    if x_col == "time_sec":
+        zoom_mask = truth[x_col].between(zoom_start_s, zoom_end_s)
+        forecast_zoom_mask = group[x_col].between(zoom_start_s, zoom_end_s)
+    else:
+        zoom_mask = pd.Series(True, index=truth.index)
+        forecast_zoom_mask = pd.Series(True, index=group.index)
+    truth = truth[zoom_mask]
+    group = group[forecast_zoom_mask]
+    if truth.empty or group.empty:
+        placeholder(path, f"No forecast samples in {zoom_start_s:g}-{zoom_end_s:g} s")
+        return
+    fig, axes = plt.subplots(1, 2, figsize=figure_size("two_panel"), sharex=True)
     axes[0].plot(
         truth[x_col],
         truth["true_real"],
@@ -437,54 +475,45 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             alpha=0.75,
             label=r"$\mathrm{Im}\{\hat{\psi}\}$",
         )
-    forecast_cmap = plt.get_cmap(CONFIG_CMAP)
-    latencies = sorted(pd.to_numeric(group["latency_samples"], errors="coerce").dropna().unique())
-    forecast_colors = {
-        latency: color
-        for latency, color in zip(
-            latencies, forecast_cmap(np.linspace(0.15, 0.85, len(latencies)))
-        )
-    }
-    for latency, latency_group in group.groupby("latency_samples", sort=True):
-        latency_x = "time_sec" if "time_sec" in latency_group.columns else "sample_index"
-        forecast_color = forecast_colors.get(float(latency), COLORS["forecast"])
-        axes[0].plot(
-            latency_group[latency_x],
-            latency_group["forecast_real"],
-            "--",
-            color=forecast_color,
-            linewidth=1.3,
-            label=f"Forecast L={int(latency)}",
-        )
-        axes[1].plot(
-            latency_group[latency_x],
-            latency_group["forecast_imag"],
-            "--",
-            color=forecast_color,
-            linewidth=1.3,
-            label=f"Forecast L={int(latency)}",
-        )
-        if "forecast_start_time_sec" in latency_group.columns:
-            start = float(latency_group["forecast_start_time_sec"].iloc[0])
-        elif "forecast_start_sample_index" in latency_group.columns:
-            start = float(latency_group["forecast_start_sample_index"].iloc[0])
-        else:
-            continue
+    axes[0].plot(
+        group[x_col],
+        group["forecast_real"],
+        "--",
+        color=COLORS["forecast"],
+        linewidth=1.5,
+        label=rf"Forecast, $L={selected_latency}$",
+    )
+    axes[1].plot(
+        group[x_col],
+        group["forecast_imag"],
+        "--",
+        color=COLORS["forecast"],
+        linewidth=1.5,
+        label=rf"Forecast, $L={selected_latency}$",
+    )
+    if "forecast_start_time_sec" in group.columns:
+        start = float(group["forecast_start_time_sec"].iloc[0])
+    elif "forecast_start_sample_index" in group.columns:
+        start = float(group["forecast_start_sample_index"].iloc[0])
+    else:
+        start = None
+    if start is not None:
         for ax in axes:
             ax.axvline(start, color=COLORS["neutral"], linestyle=":", linewidth=1.0)
-    axes[1].set_xlabel("Time [sec]" if x_col == "time_sec" else "Sample")
+    for ax in axes:
+        ax.set_xlabel("Time [sec]" if x_col == "time_sec" else "Sample")
+        if x_col == "time_sec":
+            ax.set_xlim(zoom_start_s, zoom_end_s)
     axes[0].set_ylabel("Real part")
     axes[1].set_ylabel("Imaginary part")
+    axes[0].set_title("Real")
+    axes[1].set_title("Imaginary")
     axes[0].legend(loc="upper right")
     axes[1].legend(loc="upper right")
     save_figure(fig, path)
 
 
-def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None: 
-    # TODO: include in the legend titles the percentage of runs that passed the tests below with a 95% confidence interval:
-    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults
-    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults
-    # TODO: Include also the amount of N_init used for fitting the VAR model.
+def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
     if df.empty:
         placeholder(path, "No VAR residual diagnostic data")
         return
@@ -512,6 +541,7 @@ def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
             continue
         case_id = severity_group["tracking_case_id"].iloc[0]
         severity_group = severity_group[severity_group["tracking_case_id"].eq(case_id)]
+        legend_title = _var_residual_legend_title(severity_group)
         color = COLORS["residual"]
         for row, component in enumerate(["real", "imag"]):
             ax = axes[row, col]
@@ -537,4 +567,43 @@ def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
                 )
             if row == 1:
                 ax.set_xlabel("Time [sec]")
+            ax.legend(loc="best", title=legend_title)
     save_figure(fig, path)
+
+
+def _var_residual_legend_title(df: pd.DataFrame) -> str | None:
+    parts = []
+    if "n_init_samples" in df.columns and df["n_init_samples"].notna().any():
+        parts.append(rf"$N_{{\mathrm{{init}}}}={int(df['n_init_samples'].dropna().iloc[0])}$")
+    normality_pct = _pass_percentage(df, "var_normality_pass")
+    whiteness_pct = _pass_percentage(df, "var_whiteness_pass")
+    if normality_pct is not None:
+        parts.append(f"Normality pass: {normality_pct:.0f}%")
+    if whiteness_pct is not None:
+        parts.append(f"Whiteness pass: {whiteness_pct:.0f}%")
+    return "\n".join(parts) if parts else None
+
+
+def _pass_percentage(df: pd.DataFrame, column: str) -> float | None:
+    if column not in df.columns:
+        return None
+    cases = df[["tracking_case_id", column]].drop_duplicates("tracking_case_id")
+    values = pd.to_numeric(cases[column], errors="coerce").dropna()
+    if values.empty:
+        return None
+    return float(100.0 * values.mean())
+
+
+def _unique_legend_items(axes) -> tuple[list, list[str]]:
+    handles = []
+    labels = []
+    seen = set()
+    for ax in axes:
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        for handle, label in zip(ax_handles, ax_labels, strict=True):
+            if label in seen:
+                continue
+            seen.add(label)
+            handles.append(handle)
+            labels.append(label)
+    return handles, labels

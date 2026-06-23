@@ -20,8 +20,6 @@ def plot_cycle_slips() -> None:
         Results Figure 1 diagnostic support visualizes the TVD integer
         cycle-bias trace beside the fade minima that constrain allowed jumps.
     """
-    #TODO: Put all the Legends in a third column of the plot, so that it is easier to read the plots. There is still a offset on the phase difference plots. 
-    #TODO: Include a parameter in the params.yaml that enables me to choose the index of the weak and strong scintillation examples to be processed.
     out_dir = figure_stage_dir("02_cycle_slips")
     filter_dir = figure_stage_dir("03_filter_bank")
     params = load_params()
@@ -45,12 +43,16 @@ def plot_cycle_slips() -> None:
         return
     fig, axes = plt.subplots(
         3,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 3, panel_height_cm=5.0),
+        len(severities) + 1,
+        figsize=grid_figure_size(len(severities) + 1, 3, panel_height_cm=5.0),
         sharex="col",
         constrained_layout=True,
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.65]},
         squeeze=False,
     )
+    legend_axes = axes[:, -1]
+    for ax in legend_axes:
+        ax.set_axis_off()
     intensity_values = pd.to_numeric(trace["intensity_db"], errors="coerce").dropna()
     if intensity_values.empty:
         intensity_ylim = None
@@ -112,7 +114,6 @@ def plot_cycle_slips() -> None:
         intensity_ax.set_ylabel("Intensity [dB]")
         if intensity_ylim is not None:
             intensity_ax.set_ylim(*intensity_ylim)
-        intensity_ax.legend(loc="best")
 
         estimated_col = (
             "estimated_diffractive_phase_cycles"
@@ -174,27 +175,28 @@ def plot_cycle_slips() -> None:
                 label=r"$\hat{\phi}_s-\phi_r$",
             )
         phase_ax.set_ylabel("Phase [rad]")
-        phase_ax.legend(loc="best")
-
+        estimated_diff = _zero_reference_cycles(group[estimated_col])
         error_ax.plot(
             group["time_sec"],
-            group[estimated_col],
+            estimated_diff,
             color=COLORS["truth"],
             linewidth=1,
             label=r"$\hat{\phi}_s-\phi_r$",
         )
         if "true_diffractive_phase_cycles" in group:
+            true_diff = _zero_reference_cycles(group["true_diffractive_phase_cycles"])
             error_ax.plot(
                 group["time_sec"],
-                group["true_diffractive_phase_cycles"],
+                true_diff,
                 color=COLORS["true_scintillation"],
                 linestyle="--",
                 linewidth=1,
                 label=r"$\phi_s-\phi_r$",
             )
+        integer_cycle_bias = _zero_reference_cycles(group["integer_cycle_bias"])
         error_ax.step(
             group["time_sec"],
-            group["integer_cycle_bias"],
+            integer_cycle_bias,
             where="mid",
             color=COLORS["tvd"],
             linestyle=":",
@@ -210,6 +212,7 @@ def plot_cycle_slips() -> None:
             batch_error = filter_group[batch_error_col]
             if batch_error_col == "phase_error_rad":
                 batch_error = batch_error / (2.0 * np.pi)
+            batch_error = _zero_reference_cycles(batch_error)
             error_ax.plot(
                 filter_group["time_sec"],
                 batch_error,
@@ -218,9 +221,12 @@ def plot_cycle_slips() -> None:
                 label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
             )
             if "batch_integer_cycle_bias" in filter_group:
+                batch_integer_cycle_bias = _zero_reference_cycles(
+                    filter_group["batch_integer_cycle_bias"]
+                )
                 error_ax.step(
                     filter_group["time_sec"],
-                    filter_group["batch_integer_cycle_bias"],
+                    batch_integer_cycle_bias,
                     where="mid",
                     color=COLORS["tvd"],
                     linestyle=":",
@@ -229,7 +235,32 @@ def plot_cycle_slips() -> None:
                 )
         error_ax.set_xlabel("Time [sec]")
         error_ax.set_ylabel("Phase differences [cycles]")
-        error_ax.legend(loc="best")
+    handles, labels = _unique_legend_items(axes[:, :-1].ravel())
+    if handles:
+        legend_axes[1].legend(handles, labels, loc="center left", frameon=False)
     fig.savefig(out_dir / "tvd_example_traces.pdf")
     remove_figure(filter_dir / "representative_phase_retrieval.pdf")
     plt.close(fig)
+
+
+def _zero_reference_cycles(values) -> np.ndarray:
+    series = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+    finite = np.isfinite(series)
+    if np.any(finite):
+        series = series - series[np.flatnonzero(finite)[0]]
+    return series
+
+
+def _unique_legend_items(axes) -> tuple[list, list[str]]:
+    handles = []
+    labels = []
+    seen = set()
+    for ax in axes:
+        ax_handles, ax_labels = ax.get_legend_handles_labels()
+        for handle, label in zip(ax_handles, ax_labels, strict=True):
+            if label in seen:
+                continue
+            seen.add(label)
+            handles.append(handle)
+            labels.append(label)
+    return handles, labels
