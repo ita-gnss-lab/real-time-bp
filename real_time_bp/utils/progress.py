@@ -1,7 +1,8 @@
+"""Logging and progress-bar helpers for long-running DVC stages."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
-from contextlib import contextmanager
 import sys
 from typing import TypeVar
 
@@ -14,6 +15,7 @@ _LOGGING_CONFIGURED = False
 
 
 def configure_logging() -> None:
+    """Configure Loguru once with compact timestamps for stage output."""
     global _LOGGING_CONFIGURED
     if _LOGGING_CONFIGURED:
         return
@@ -33,6 +35,17 @@ def progress_iter(
     total: int | None = None,
     unit: str = "it",
 ) -> Iterator[T]:
+    """Wrap an iterable in a tqdm progress bar.
+
+    Args:
+        iterable: Values to yield.
+        desc: Progress-bar label.
+        total: Optional total count.
+        unit: Unit label shown by tqdm.
+
+    Yields:
+        Values from `iterable`.
+    """
     yield from tqdm(
         iterable,
         desc=desc,
@@ -42,19 +55,3 @@ def progress_iter(
         mininterval=2.0,
         smoothing=0.1,
     )
-
-
-@contextmanager
-def progress_bar(*, desc: str, total: int | None = None, unit: str = "it"):
-    bar = tqdm(
-        desc=desc,
-        total=total,
-        unit=unit,
-        dynamic_ncols=True,
-        mininterval=2.0,
-        smoothing=0.1,
-    )
-    try:
-        yield bar
-    finally:
-        bar.close()

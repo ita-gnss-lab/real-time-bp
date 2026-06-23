@@ -1,3 +1,5 @@
+"""Dataset discovery and streaming readers for tracking-output CSVs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,25 +11,6 @@ import pandas as pd
 
 from real_time_bp.config import PROJECT_ROOT
 
-TRACKING_REQUIRED_COLUMNS = {
-    "tracking_case_id",
-    "example_idx",
-    "c_n0_idx",
-    "epoch_idx",
-    "time_sec",
-    "svid",
-    "frequency",
-    "input_c_n0_db_hz",
-    "init_doppler_error_hz",
-    "carrier_phase_est_m",
-    "los_phase_m",
-    "scint_phase_m",
-    "true_refractive_phase_m",
-    "tracked_intensity",
-    "estimated_c_n0_db_hz",
-    "true_intensity",
-    "severity",
-}
 TRACKING_BASE_REQUIRED_COLUMNS = {
     "tracking_case_id",
     "example_idx",
@@ -61,6 +44,8 @@ TRACKING_READ_DTYPES = {
 
 @dataclass(frozen=True)
 class DatasetPaths:
+    """Resolved paths for a supported tracking-output dataset layout."""
+
     root: Path
     layout: str
     diagnostics_csv: Path
@@ -68,6 +53,14 @@ class DatasetPaths:
 
 
 def resolve_path(path: str | Path) -> Path:
+    """Resolve a path relative to the project root when needed.
+
+    Args:
+        path: Absolute or project-relative path.
+
+    Returns:
+        Absolute resolved path.
+    """
     candidate = Path(path)
     if candidate.is_absolute():
         return candidate
@@ -75,17 +68,23 @@ def resolve_path(path: str | Path) -> Path:
 
 
 def find_dataset_paths(params: dict) -> DatasetPaths:
-    dataset_cfg = params.get("dataset", {})
-    candidates = [resolve_path(dataset_cfg.get("output_dir", "data/raw/backpropagation"))]
-    for fallback in dataset_cfg.get("local_fallback_dirs", []) or []:
-        candidates.append(resolve_path(fallback))
+    """Find the tracking-output dataset described by params.
 
-    for root in candidates:
-        tracking_root = _find_tracking_root(root)
-        if tracking_root is not None:
-            return tracking_root
-    searched = "\n".join(str(path) for path in candidates)
-    raise FileNotFoundError(f"Unable to locate tracking dataset. Searched:\n{searched}")
+    Args:
+        params: Parsed `params.yaml` dictionary.
+
+    Returns:
+        Resolved dataset paths.
+
+    Raises:
+        FileNotFoundError: If no supported tracking-output layout is found.
+    """
+    dataset_cfg = params.get("dataset", {})
+    root = resolve_path(dataset_cfg.get("output_dir", "data/raw/backpropagation"))
+    tracking_root = _find_tracking_root(root)
+    if tracking_root is None:
+        raise FileNotFoundError(f"Unable to locate tracking dataset under {root}")
+    return tracking_root
 
 
 def _find_tracking_root(root: Path) -> DatasetPaths | None:
@@ -95,11 +94,8 @@ def _find_tracking_root(root: Path) -> DatasetPaths | None:
         root,
         root / "tracking_outputs",
         root / "tracking_outputs" / "main",
-        root / "observables",
-        root / "observables" / "main",
     ]
     possible_roots.extend(root.glob("*/tracking_outputs/main"))
-    possible_roots.extend(root.glob("*/observables/main"))
 
     for candidate in possible_roots:
         if not candidate.exists():
@@ -108,59 +104,57 @@ def _find_tracking_root(root: Path) -> DatasetPaths | None:
         tracking_files = tuple(sorted(candidate.glob("tracking_measurements_*.csv")))
         if diagnostics.exists() and tracking_files:
             return DatasetPaths(candidate, "tracking_outputs", diagnostics, tracking_files)
-        observable_files = tuple(sorted(candidate.glob("observables_*.csv")))
-        if diagnostics.exists() and observable_files:
-            return DatasetPaths(candidate, "observables", diagnostics, observable_files)
     return None
 
 
 def load_diagnostics(paths: DatasetPaths) -> pd.DataFrame:
+    """Load diagnostics metadata for all tracking cases.
+
+    Args:
+        paths: Resolved dataset paths.
+
+    Returns:
+        Diagnostics DataFrame with integer identifier columns normalized.
+    """
     diagnostics = pd.read_csv(paths.diagnostics_csv)
     for column in ["tracking_case_id", "example_idx", "c_n0_idx"]:
         if column in diagnostics:
-            diagnostics[column] = pd.to_numeric(diagnostics[column], errors="coerce").astype("Int64")
+            diagnostics[column] = pd.to_numeric(diagnostics[column], errors="coerce").astype(
+                "Int64"
+            )
     return diagnostics
 
 
 def load_case_index(paths: DatasetPaths) -> pd.DataFrame:
-    diagnostics = load_diagnostics(paths)
-    if paths.layout == "tracking_outputs":
-        columns = [
-            column
-            for column in [
-                "tracking_case_id",
-                "example_idx",
-                "c_n0_idx",
-                "case_seed",
-                "svid",
-                "frequency",
-                "severity",
-                "input_c_n0_db_hz",
-                "rhof_veff_ratio",
-                "init_doppler_error_hz",
-                "estimated_c_n0_db_hz_mean",
-                "estimated_c_n0_db_hz_median",
-                "loss_of_lock",
-            ]
-            if column in diagnostics.columns
-        ]
-        return diagnostics[columns].copy()
+    """Load one metadata row per tracking case.
 
-    rows: list[dict] = []
-    for csv_path in paths.measurement_csvs:
-        head = pd.read_csv(csv_path, nrows=1)
-        if head.empty:
-            continue
-        row = head.iloc[0].to_dict()
-        matching = diagnostics[
-            (diagnostics.get("city", "") == row.get("city"))
-            & (diagnostics.get("svid", "") == row.get("svid"))
-            & (diagnostics.get("frequency", "") == row.get("frequency"))
-            & (diagnostics.get("severity", "") == row.get("severity"))
+    Args:
+        paths: Resolved dataset paths.
+
+    Returns:
+        Case-index DataFrame containing only columns needed by stages.
+    """
+    diagnostics = load_diagnostics(paths)
+    columns = [
+        column
+        for column in [
+            "tracking_case_id",
+            "example_idx",
+            "c_n0_idx",
+            "case_seed",
+            "svid",
+            "frequency",
+            "severity",
+            "input_c_n0_db_hz",
+            "rhof_veff_ratio",
+            "init_doppler_error_hz",
+            "estimated_c_n0_db_hz_mean",
+            "estimated_c_n0_db_hz_median",
+            "loss_of_lock",
         ]
-        meta = matching.iloc[0].to_dict() if not matching.empty else {}
-        rows.append({**meta, **{k: row.get(k) for k in ["city", "svid", "frequency", "severity"]}})
-    return pd.DataFrame(rows)
+        if column in diagnostics.columns
+    ]
+    return diagnostics[columns].copy()
 
 
 def count_cases(
@@ -168,6 +162,16 @@ def count_cases(
     severities: list[str] | None = None,
     max_cases_per_condition: int | None = None,
 ) -> int | None:
+    """Count cases after applying severity and per-condition limits.
+
+    Args:
+        paths: Resolved dataset paths.
+        severities: Optional severity labels to keep.
+        max_cases_per_condition: Optional limit per severity/CN0 condition.
+
+    Returns:
+        Case count, or None when no case index is available.
+    """
     case_index = load_case_index(paths)
     if case_index.empty:
         return None
@@ -184,7 +188,10 @@ def count_cases(
     else:
         condition_columns = ["severity"]
     return int(
-        case_index.groupby(condition_columns, dropna=False).size().clip(upper=max_cases_per_condition).sum()
+        case_index.groupby(condition_columns, dropna=False)
+        .size()
+        .clip(upper=max_cases_per_condition)
+        .sum()
     )
 
 
@@ -195,6 +202,18 @@ def iter_case_dataframes(
     chunksize: int = 250_000,
     columns: set[str] | None = None,
 ) -> Iterator[tuple[dict, pd.DataFrame]]:
+    """Stream tracking cases as individual DataFrames.
+
+    Args:
+        paths: Resolved dataset paths.
+        severities: Optional severity labels to keep.
+        max_cases_per_condition: Optional limit per severity/CN0 condition.
+        chunksize: CSV chunk size used while reading measurement files.
+        columns: Optional measurement columns to load in addition to metadata.
+
+    Yields:
+        Pairs of case metadata and a DataFrame containing one complete case.
+    """
     diagnostics = load_diagnostics(paths)
     diagnostics_by_case = (
         diagnostics.set_index("tracking_case_id", drop=False)
@@ -205,12 +224,7 @@ def iter_case_dataframes(
     yielded_by_condition: dict[tuple[str, float | str], int] = {}
 
     for csv_path in paths.measurement_csvs:
-        if paths.layout == "tracking_outputs":
-            iterator = _iter_tracking_cases_from_csv(csv_path, chunksize, columns)
-        else:
-            iterator = _iter_observable_cases_from_csv(csv_path, diagnostics, chunksize)
-
-        for metadata, case_df in iterator:
+        for metadata, case_df in _iter_tracking_cases_from_csv(csv_path, chunksize, columns):
             if not diagnostics_by_case.empty and "tracking_case_id" in metadata:
                 case_id = metadata["tracking_case_id"]
                 if case_id in diagnostics_by_case.index:
@@ -261,29 +275,6 @@ def _tracking_read_kwargs(columns: set[str] | None) -> dict:
     }
 
 
-def _iter_observable_cases_from_csv(
-    csv_path: Path,
-    diagnostics: pd.DataFrame,
-    chunksize: int,
-) -> Iterator[tuple[dict, pd.DataFrame]]:
-    key_columns = ["city", "svid", "frequency", "severity"]
-    pending = pd.DataFrame()
-    for chunk in pd.read_csv(csv_path, chunksize=chunksize):
-        if not pending.empty:
-            chunk = pd.concat([pending, chunk], ignore_index=True)
-            pending = pd.DataFrame()
-        key_frame = chunk[key_columns].astype(str).agg("|".join, axis=1)
-        last_key = key_frame.iloc[-1]
-        complete = chunk[key_frame != last_key]
-        pending = chunk[key_frame == last_key].copy()
-        for _, group in complete.groupby(key_columns, sort=False):
-            metadata = _metadata_from_observable_case(group, diagnostics)
-            yield metadata, _normalize_observable_case(group, metadata)
-    if not pending.empty:
-        metadata = _metadata_from_observable_case(pending, diagnostics)
-        yield metadata, _normalize_observable_case(pending, metadata)
-
-
 def _normalize_tracking_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
     missing = TRACKING_BASE_REQUIRED_COLUMNS - set(chunk.columns)
     if missing:
@@ -307,58 +298,3 @@ def _metadata_from_case(case_df: pd.DataFrame) -> dict:
         if column in case_df.columns:
             metadata[column] = float(first[column])
     return metadata
-
-
-def _metadata_from_observable_case(case_df: pd.DataFrame, diagnostics: pd.DataFrame) -> dict:
-    first = case_df.iloc[0]
-    metadata = {
-        "city": str(first.get("city", "")),
-        "svid": str(first["svid"]),
-        "frequency": str(first["frequency"]),
-        "severity": str(first["severity"]),
-        "input_c_n0_db_hz": np.nan,
-        "init_doppler_error_hz": np.nan,
-    }
-    if not diagnostics.empty:
-        mask = (
-            (diagnostics.get("city", "") == metadata["city"])
-            & (diagnostics.get("svid", "") == metadata["svid"])
-            & (diagnostics.get("frequency", "") == metadata["frequency"])
-            & (diagnostics.get("severity", "") == metadata["severity"])
-        )
-        match = diagnostics[mask]
-        if not match.empty:
-            metadata.update(match.iloc[0].to_dict())
-    return metadata
-
-
-def _normalize_observable_case(case_df: pd.DataFrame, metadata: dict) -> pd.DataFrame:
-    df = case_df.copy()
-    df["tracking_case_id"] = int(metadata.get("tracking_case_id", 0) or 0)
-    df["example_idx"] = int(metadata.get("example_idx", 0) or 0)
-    df["c_n0_idx"] = int(metadata.get("c_n0_idx", 0) or 0)
-    df["input_c_n0_db_hz"] = float(metadata.get("input_c_n0_db_hz", np.nan))
-    df["init_doppler_error_hz"] = float(metadata.get("init_doppler_error_hz", np.nan))
-    df["estimated_c_n0_db_hz"] = np.nan
-    return df[
-        [
-            "tracking_case_id",
-            "example_idx",
-            "c_n0_idx",
-            "epoch_idx",
-            "time_sec",
-            "svid",
-            "frequency",
-            "input_c_n0_db_hz",
-            "init_doppler_error_hz",
-            "carrier_phase_est_m",
-            "los_phase_m",
-            "elevation_deg",
-            "scint_phase_m",
-            "true_refractive_phase_m",
-            "tracked_intensity",
-            "estimated_c_n0_db_hz",
-            "true_intensity",
-            "severity",
-        ]
-    ].sort_values("epoch_idx").reset_index(drop=True)

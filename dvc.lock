@@ -35,8 +35,8 @@ stages:
       size: 1020
     - path: real_time_bp/stage_utils.py
       hash: md5
-      md5: a56ef84c33882b2a432db0fdb9c7e027
-      size: 4840
+      md5: d0506cdbcc9d3aa188708a84b987bfed
+      size: 5334
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 19ce4f53ec63f0bd846d1abba4442a0f
@@ -65,22 +65,32 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
+          - 512
           - 1024
+          - 1536
           - 2048
+          - 3072
           - 4096
+          - 5120
+          - 6144
+          - 7168
           - 8192
+          - 9216
+          - 10240
+          - 11264
+          - 12288
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 36
-          residual_geometric_error_mps_min: 0.0
-          residual_geometric_error_mps_max: 0.1
-          residual_geometric_error_count: 15
-          representative_c_n0_db_hz: 30.0
+          residual_doppler_error_hz_min: 0.0
+          residual_doppler_error_hz_max: 20.0
+          residual_doppler_error_count: 21
+          representative_c_n0_db_hz: 55.0
     outs:
     - path: results/csv/01_dataset
       hash: md5
-      md5: bb24517dd53d9099bc123015749d4213.dir
-      size: 290737
+      md5: d1743b1db5f1c4a88bd2a7cb7afd3c1a.dir
+      size: 290678
       nfiles: 5
   cycle_slip_results:
     cmd: uv run python -m real_time_bp.get_cycle_slip_results
@@ -96,24 +106,28 @@ stages:
       size: 336
     - path: real_time_bp/get_cycle_slip_results.py
       hash: md5
-      md5: da280d71e33ac8250469f45167485a70
-      size: 10527
+      md5: 05f85c50e1dd4984cdd1ab0059f77096
+      size: 14757
     - path: real_time_bp/methodology/constants.py
       hash: md5
       md5: 18ce5711496ae72663e6a2ffef4b81b6
       size: 1020
     - path: real_time_bp/methodology/signal_model.py
       hash: md5
-      md5: 88680ae2d95b0cdc8816bc24294654f2
-      size: 3105
+      md5: e318895b1ac29e071d4ab5c997ae01eb
+      size: 3568
     - path: real_time_bp/methodology/tvd.py
       hash: md5
       md5: 3c3e92eff6fa3ecdd7b5bebcd5f85e65
       size: 3692
+    - path: real_time_bp/representatives.py
+      hash: md5
+      md5: 8f86083b8f17a115da75674198b2b9e0
+      size: 2086
     - path: real_time_bp/stage_utils.py
       hash: md5
-      md5: a56ef84c33882b2a432db0fdb9c7e027
-      size: 4840
+      md5: d0506cdbcc9d3aa188708a84b987bfed
+      size: 5334
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 19ce4f53ec63f0bd846d1abba4442a0f
@@ -132,8 +146,8 @@ stages:
       size: 1174
     - path: results/csv/01_dataset
       hash: md5
-      md5: bb24517dd53d9099bc123015749d4213.dir
-      size: 290737
+      md5: d1743b1db5f1c4a88bd2a7cb7afd3c1a.dir
+      size: 290678
       nfiles: 5
     params:
       params.yaml:
@@ -151,21 +165,31 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
+          - 512
           - 1024
+          - 1536
           - 2048
+          - 3072
           - 4096
+          - 5120
+          - 6144
+          - 7168
           - 8192
+          - 9216
+          - 10240
+          - 11264
+          - 12288
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 36
-          residual_geometric_error_mps_min: 0.0
-          residual_geometric_error_mps_max: 0.1
-          residual_geometric_error_count: 15
-          representative_c_n0_db_hz: 30.0
+          residual_doppler_error_hz_min: 0.0
+          residual_doppler_error_hz_max: 20.0
+          residual_doppler_error_count: 21
+          representative_c_n0_db_hz: 55.0
         runtime:
           csv_chunksize: 75000
           csv_write_batch_rows: 50000
-          parallel_workers: 4
+          parallel_workers: 12
         tvd:
           fade_threshold_db: -15.0
           allowed_jump_weight: 1.0
@@ -173,9 +197,9 @@ stages:
     outs:
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: 11dddf17f98a141c434fbc6e011852d9.dir
-      size: 3178126
-      nfiles: 3
+      md5: b4119c44d0fc624eedba08c67a3d2f72.dir
+      size: 3525365
+      nfiles: 4
   filter_bank_results:
     cmd: uv run python -m real_time_bp.get_filter_bank_results
     deps:
@@ -190,8 +214,8 @@ stages:
       size: 336
     - path: real_time_bp/get_filter_bank_results.py
       hash: md5
-      md5: c68b09ee05f033b3398d692325eff976
-      size: 19857
+      md5: 2546c2903c4b31cfee03b429017c2aca
+      size: 22906
     - path: real_time_bp/methodology/backpropagation.py
       hash: md5
       md5: 7936d8949263f375735a8984f4d97a0e
@@ -210,12 +234,16 @@ stages:
       size: 3927
     - path: real_time_bp/methodology/signal_model.py
       hash: md5
-      md5: 88680ae2d95b0cdc8816bc24294654f2
-      size: 3105
+      md5: e318895b1ac29e071d4ab5c997ae01eb
+      size: 3568
+    - path: real_time_bp/representatives.py
+      hash: md5
+      md5: 8f86083b8f17a115da75674198b2b9e0
+      size: 2086
     - path: real_time_bp/stage_utils.py
       hash: md5
-      md5: a56ef84c33882b2a432db0fdb9c7e027
-      size: 4840
+      md5: d0506cdbcc9d3aa188708a84b987bfed
+      size: 5334
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 19ce4f53ec63f0bd846d1abba4442a0f
@@ -234,14 +262,14 @@ stages:
       size: 1174
     - path: results/csv/01_dataset
       hash: md5
-      md5: bb24517dd53d9099bc123015749d4213.dir
-      size: 290737
+      md5: d1743b1db5f1c4a88bd2a7cb7afd3c1a.dir
+      size: 290678
       nfiles: 5
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: 11dddf17f98a141c434fbc6e011852d9.dir
-      size: 3178126
-      nfiles: 3
+      md5: b4119c44d0fc624eedba08c67a3d2f72.dir
+      size: 3525365
+      nfiles: 4
     params:
       params.yaml:
         constants:
@@ -258,26 +286,36 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
+          - 512
           - 1024
+          - 1536
           - 2048
+          - 3072
           - 4096
+          - 5120
+          - 6144
+          - 7168
           - 8192
+          - 9216
+          - 10240
+          - 11264
+          - 12288
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 36
-          residual_geometric_error_mps_min: 0.0
-          residual_geometric_error_mps_max: 0.1
-          residual_geometric_error_count: 15
-          representative_c_n0_db_hz: 30.0
+          residual_doppler_error_hz_min: 0.0
+          residual_doppler_error_hz_max: 20.0
+          residual_doppler_error_count: 21
+          representative_c_n0_db_hz: 55.0
         runtime:
           csv_chunksize: 75000
           csv_write_batch_rows: 50000
-          parallel_workers: 4
+          parallel_workers: 12
     outs:
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: d2c875cdcc6ea62cf8868dddb4f65908.dir
-      size: 12106223
+      md5: 8e3570345647cea879b4add7c0f7331b.dir
+      size: 14624075
       nfiles: 8
   near_real_time_results:
     cmd: uv run python -m real_time_bp.get_near_real_time_results
@@ -293,8 +331,8 @@ stages:
       size: 336
     - path: real_time_bp/get_near_real_time_results.py
       hash: md5
-      md5: d4cd5daf02e618809d9c94aa396bad59
-      size: 22787
+      md5: 413f1077851f85b0d9f3244593eb3607
+      size: 33680
     - path: real_time_bp/methodology/backpropagation.py
       hash: md5
       md5: 7936d8949263f375735a8984f4d97a0e
@@ -317,12 +355,16 @@ stages:
       size: 4779
     - path: real_time_bp/methodology/signal_model.py
       hash: md5
-      md5: 88680ae2d95b0cdc8816bc24294654f2
-      size: 3105
+      md5: e318895b1ac29e071d4ab5c997ae01eb
+      size: 3568
+    - path: real_time_bp/representatives.py
+      hash: md5
+      md5: 8f86083b8f17a115da75674198b2b9e0
+      size: 2086
     - path: real_time_bp/stage_utils.py
       hash: md5
-      md5: a56ef84c33882b2a432db0fdb9c7e027
-      size: 4840
+      md5: d0506cdbcc9d3aa188708a84b987bfed
+      size: 5334
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 19ce4f53ec63f0bd846d1abba4442a0f
@@ -341,13 +383,18 @@ stages:
       size: 1174
     - path: results/csv/01_dataset
       hash: md5
-      md5: bb24517dd53d9099bc123015749d4213.dir
-      size: 290737
+      md5: d1743b1db5f1c4a88bd2a7cb7afd3c1a.dir
+      size: 290678
       nfiles: 5
+    - path: results/csv/02_cycle_slips
+      hash: md5
+      md5: b4119c44d0fc624eedba08c67a3d2f72.dir
+      size: 3525365
+      nfiles: 4
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: d2c875cdcc6ea62cf8868dddb4f65908.dir
-      size: 12106223
+      md5: 8e3570345647cea879b4add7c0f7331b.dir
+      size: 14624075
       nfiles: 8
     params:
       params.yaml:
@@ -365,39 +412,71 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
+          - 512
           - 1024
+          - 1536
           - 2048
+          - 3072
           - 4096
+          - 5120
+          - 6144
+          - 7168
           - 8192
+          - 9216
+          - 10240
+          - 11264
+          - 12288
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 36
-          residual_geometric_error_mps_min: 0.0
-          residual_geometric_error_mps_max: 0.1
-          residual_geometric_error_count: 15
-          representative_c_n0_db_hz: 30.0
+          residual_doppler_error_hz_min: 0.0
+          residual_doppler_error_hz_max: 20.0
+          residual_doppler_error_count: 21
+          representative_c_n0_db_hz: 55.0
         near_real_time:
           var_order_min: 1
           var_order_max: 24
-          fft_m_min: 512
-          fft_m_max: 8192
-          fft_m_count: 16
-          heatmap_latency_stride: 64
-          heatmap_eval_samples: 32
+          fft_m_values:
+          - 512
+          - 768
+          - 1024
+          - 1536
+          - 2048
+          - 3072
+          - 4096
+          - 6144
+          - 8192
+          heatmap_latency_fractions:
+          - 0.0
+          - 0.03125
+          - 0.0625
+          - 0.125
+          - 0.25
+          - 0.5
+          - 0.75
+          - 1.0
+          heatmap_eval_samples: 128
           practical_fft_m: 8192
           practical_latency_samples: 4095
           heatmap_max_cases_per_severity: 1
           example_context_samples: 160
+          example_ml_configs:
+          - block_len: 2048
+            latency_samples: 0
+          - block_len: 4096
+            latency_samples: 1024
+          - block_len: 8192
+            latency_samples: 4095
         runtime:
           csv_chunksize: 75000
           csv_write_batch_rows: 50000
-          parallel_workers: 4
+          parallel_workers: 12
     outs:
     - path: results/csv/04_near_real_time
       hash: md5
-      md5: b74ea57f11540a5791f14e65d35f72fc.dir
-      size: 5214690
-      nfiles: 5
+      md5: a534d10be21f3b8b45673604512adef5.dir
+      size: 13889329
+      nfiles: 7
   result_plots:
     cmd: uv run python -m real_time_bp.get_results_plots
     deps:
@@ -407,16 +486,20 @@ stages:
       size: 336
     - path: real_time_bp/get_results_plots.py
       hash: md5
-      md5: 9feb3d6079ac4b150e5b567c6b6f5ebf
-      size: 19917
+      md5: 9ee289a2d22d52fbe53bf7399124db14
+      size: 34431
     - path: real_time_bp/methodology/filter_bank.py
       hash: md5
       md5: 5bd057fdcc0186537c0590245ccd102f
       size: 1829
+    - path: real_time_bp/representatives.py
+      hash: md5
+      md5: 8f86083b8f17a115da75674198b2b9e0
+      size: 2086
     - path: real_time_bp/stage_utils.py
       hash: md5
-      md5: a56ef84c33882b2a432db0fdb9c7e027
-      size: 4840
+      md5: d0506cdbcc9d3aa188708a84b987bfed
+      size: 5334
     - path: real_time_bp/utils/params.py
       hash: md5
       md5: 431ad5d20f07c3ef961b812b5c57de12
@@ -427,24 +510,24 @@ stages:
       size: 1174
     - path: results/csv/01_dataset
       hash: md5
-      md5: bb24517dd53d9099bc123015749d4213.dir
-      size: 290737
+      md5: d1743b1db5f1c4a88bd2a7cb7afd3c1a.dir
+      size: 290678
       nfiles: 5
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: 11dddf17f98a141c434fbc6e011852d9.dir
-      size: 3178126
-      nfiles: 3
+      md5: b4119c44d0fc624eedba08c67a3d2f72.dir
+      size: 3525365
+      nfiles: 4
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: d2c875cdcc6ea62cf8868dddb4f65908.dir
-      size: 12106223
+      md5: 8e3570345647cea879b4add7c0f7331b.dir
+      size: 14624075
       nfiles: 8
     - path: results/csv/04_near_real_time
       hash: md5
-      md5: b74ea57f11540a5791f14e65d35f72fc.dir
-      size: 5214690
-      nfiles: 5
+      md5: a534d10be21f3b8b45673604512adef5.dir
+      size: 13889329
+      nfiles: 7
     params:
       params.yaml:
         experiments:
@@ -454,23 +537,33 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
+          - 512
           - 1024
+          - 1536
           - 2048
+          - 3072
           - 4096
+          - 5120
+          - 6144
+          - 7168
           - 8192
+          - 9216
+          - 10240
+          - 11264
+          - 12288
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 36
-          residual_geometric_error_mps_min: 0.0
-          residual_geometric_error_mps_max: 0.1
-          residual_geometric_error_count: 15
-          representative_c_n0_db_hz: 30.0
+          residual_doppler_error_hz_min: 0.0
+          residual_doppler_error_hz_max: 20.0
+          residual_doppler_error_count: 21
+          representative_c_n0_db_hz: 55.0
         plots:
           csv_dir: results/csv
           figures_dir: results/figures
     outs:
     - path: results/figures
       hash: md5
-      md5: 376aec799dc624268e55cfce521466ba.dir
-      size: 693303
+      md5: 26513952f696232f9c5d2aa62f2684de.dir
+      size: 1214388
       nfiles: 12

@@ -1,3 +1,5 @@
+"""Generate TVD cycle-slip CSV outputs for the paper results."""
+
 from __future__ import annotations
 
 from loguru import logger
@@ -11,21 +13,24 @@ from real_time_bp.methodology.signal_model import (
     true_scintillation_phase_rad,
 )
 from real_time_bp.methodology.tvd import detect_cycle_slips_from_tvd
-from real_time_bp.representatives import SEVERITY_ORDER, sort_by_severity
-from real_time_bp.stage_utils import (
+from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
+from real_time_bp.utils.output_rows import sampled_time_rows
+from real_time_bp.utils.parallel import ordered_parallel_map
+from real_time_bp.utils.params import load_params
+from real_time_bp.utils.progress import configure_logging, progress_iter
+from real_time_bp.utils.representatives import SEVERITY_ORDER, sort_by_severity
+from real_time_bp.utils.stage import (
     BufferedCsvWriter,
+    case_keys,
     csv_chunksize_from_params,
     csv_stage_dir,
     csv_write_batch_rows_from_params,
+    is_loss_of_lock,
     l1_wavelength_from_params,
     optional_int,
     parallel_workers_from_params,
     write_csv,
 )
-from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
-from real_time_bp.utils.parallel import ordered_parallel_map
-from real_time_bp.utils.params import load_params
-from real_time_bp.utils.progress import configure_logging, progress_iter
 
 TVD_TRACKING_COLUMNS = {
     "carrier_phase_est_m",
@@ -108,15 +113,21 @@ REPRESENTATIVE_COLUMNS = [
     "abs_diffractive_phase_slope_cycles_per_s",
     "diffractive_phase_span_cycles",
 ]
+STAGE_DIR = "02_cycle_slips"
+EVENTS_CSV = "tvd_cycle_slip_events.csv"
+SUMMARY_CSV = "tvd_cycle_slip_summary.csv"
+REPRESENTATIVES_CSV = "tvd_representative_cases.csv"
+TRACES_CSV = "tvd_example_traces.csv"
 
 
 def main() -> None:
+    """Run the TVD cycle-slip stage and write events, summaries, and traces."""
     configure_logging()
     logger.info("Starting TVD cycle-slip stage")
     params = load_params()
     experiments = params.get("experiments", {})
     tvd_cfg = params.get("tvd", {})
-    out_dir = csv_stage_dir("02_cycle_slips")
+    out_dir = csv_stage_dir(STAGE_DIR)
     paths = find_dataset_paths(params)
     logger.info("Using dataset root {}", paths.root)
     wavelength_m = l1_wavelength_from_params(params)
@@ -150,12 +161,12 @@ def main() -> None:
     best_by_severity: dict[str, tuple[tuple[float, ...], dict]] = {}
     with (
         BufferedCsvWriter(
-            out_dir / "tvd_cycle_slip_events.csv",
+            out_dir / EVENTS_CSV,
             columns=EVENT_COLUMNS,
             batch_rows=write_batch_rows,
         ) as event_writer,
         BufferedCsvWriter(
-            out_dir / "tvd_cycle_slip_summary.csv",
+            out_dir / SUMMARY_CSV,
             columns=SUMMARY_COLUMNS,
             batch_rows=write_batch_rows,
         ) as summary_writer,
@@ -179,10 +190,12 @@ def main() -> None:
     representative_rows = _representative_rows(best_by_severity)
     write_csv(
         pd.DataFrame(representative_rows, columns=REPRESENTATIVE_COLUMNS),
-        out_dir / "tvd_representative_cases.csv",
+        out_dir / REPRESENTATIVES_CSV,
     )
     selected_case_ids = {
-        int(row["tracking_case_id"]) for row in representative_rows if row.get("tracking_case_id") is not None
+        int(row["tracking_case_id"])
+        for row in representative_rows
+        if row.get("tracking_case_id") is not None
     }
     trace_case_iter = iter_case_dataframes(
         paths,
@@ -192,7 +205,7 @@ def main() -> None:
         columns=TVD_TRACKING_COLUMNS,
     )
     with BufferedCsvWriter(
-        out_dir / "tvd_example_traces.csv",
+        out_dir / TRACES_CSV,
         columns=TRACE_COLUMNS,
         batch_rows=write_batch_rows,
     ) as trace_writer:
@@ -246,7 +259,11 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         float(blocked_jump_weight),
     )
     fade_minima_set = set(int(x) for x in fade_minima)
-    case_keys = _case_keys(metadata)
+    metadata_keys = case_keys(
+        metadata,
+        include_loss_of_lock=True,
+        include_true_fresnel_time=True,
+    )
 
     # Paper/TVD output convention: slips are recorded at fade minima where the
     # rounded TVD cycle-bias staircase changes by a nonzero integer.
@@ -256,7 +273,7 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         integer_cycle_jump = int(integer_cycle_bias[jump_to_idx] - integer_cycle_bias[int(idx)])
         event_rows.append(
             {
-                **case_keys,
+                **metadata_keys,
                 "sample_index": int(idx),
                 "time_sec": float(time_sec[idx]),
                 "integer_cycle_bias": int(integer_cycle_bias[jump_to_idx]),
@@ -270,7 +287,7 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
     # Paper: Results Section III.2; this summary supports CS/min,
     # phase-slope diagnostics, and per-condition aggregation.
     summary_row = {
-        **case_keys,
+        **metadata_keys,
         "n_samples": int(case_df.shape[0]),
         "n_fade_minima": int(fade_minima.size),
         "n_tvd_cycle_slips": int(cycle_slip_indices.size),
@@ -328,7 +345,6 @@ def _compute_tvd_trace_rows(
     allowed_jump_weight: float,
     blocked_jump_weight: float,
 ) -> list[dict]:
-    time_sec = case_df["time_sec"].to_numpy(dtype=float)
     intensity_db = detrended_intensity_db(case_df)
     estimated_phase = estimated_scintillation_phase_rad(case_df, float(wavelength_m))
     true_scintillation = true_scintillation_phase_rad(case_df, float(wavelength_m))
@@ -343,28 +359,27 @@ def _compute_tvd_trace_rows(
         float(blocked_jump_weight),
     )
     fade_minima_set = set(int(x) for x in fade_minima)
-    case_keys = _case_keys(metadata)
-    trace_rows = []
-    stride = max(len(case_df) // 2500, 1)
-    for idx in range(0, len(case_df), stride):
-        trace_rows.append(
-            {
-                **case_keys,
-                "sample_index": int(idx),
-                "time_sec": float(time_sec[idx]),
-                "intensity_db": float(intensity_db[idx]),
-                "diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
-                "estimated_diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
-                "true_diffractive_phase_cycles": float(true_diffractive_cycles[idx]),
-                "integer_cycle_bias": int(integer_cycle_bias[idx]),
-                "is_fade_minimum": idx in fade_minima_set,
-            }
-        )
-    return trace_rows
+    metadata_keys = case_keys(
+        metadata,
+        include_loss_of_lock=True,
+        include_true_fresnel_time=True,
+    )
+    return sampled_time_rows(
+        case_df,
+        metadata_keys,
+        lambda idx: {
+            "intensity_db": float(intensity_db[idx]),
+            "diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
+            "estimated_diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
+            "true_diffractive_phase_cycles": float(true_diffractive_cycles[idx]),
+            "integer_cycle_bias": int(integer_cycle_bias[idx]),
+            "is_fade_minimum": idx in fade_minima_set,
+        },
+    )
 
 
 def _representative_rank_key(summary_row: dict) -> tuple[float, ...] | None:
-    if _is_loss_of_lock(summary_row):
+    if is_loss_of_lock(summary_row):
         return None
     severity = str(summary_row.get("severity"))
     n_slips = int(summary_row.get("n_tvd_cycle_slips") or 0)
@@ -375,7 +390,9 @@ def _representative_rank_key(summary_row: dict) -> tuple[float, ...] | None:
     return (slip_penalty, -c_n0, slope, case_id)
 
 
-def _representative_rows(best_by_severity: dict[str, tuple[tuple[float, ...], dict]]) -> list[dict]:
+def _representative_rows(
+    best_by_severity: dict[str, tuple[tuple[float, ...], dict]],
+) -> list[dict]:
     rows = []
     for severity in SEVERITY_ORDER:
         if severity not in best_by_severity:
@@ -396,30 +413,6 @@ def _linear_slope_cycles_per_s(time_sec: np.ndarray, phase_cycles: np.ndarray) -
     if finite.sum() < 2:
         return float("nan")
     return float(np.polyfit(time_rel[finite], phase_cycles[finite], 1)[0])
-
-
-def _case_keys(metadata: dict) -> dict:
-    return {
-        "tracking_case_id": metadata.get("tracking_case_id"),
-        "example_idx": metadata.get("example_idx"),
-        "c_n0_idx": metadata.get("c_n0_idx"),
-        "severity": metadata.get("severity"),
-        "frequency": metadata.get("frequency"),
-        "svid": metadata.get("svid"),
-        "input_c_n0_db_hz": metadata.get("input_c_n0_db_hz"),
-        "init_doppler_error_hz": metadata.get("init_doppler_error_hz"),
-        "loss_of_lock": _is_loss_of_lock(metadata),
-        "true_fresnel_time_scale_s": metadata.get("rhof_veff_ratio"),
-    }
-
-
-def _is_loss_of_lock(metadata: dict) -> bool:
-    value = metadata.get("loss_of_lock", False)
-    if value is None:
-        return False
-    if isinstance(value, str):
-        return value.strip().lower() in {"1", "true", "yes"}
-    return bool(value)
 
 
 if __name__ == "__main__":

@@ -1,20 +1,23 @@
+"""Generate dataset summary CSVs used by downstream result stages."""
+
 from __future__ import annotations
 
 from loguru import logger
 import pandas as pd
 
-from real_time_bp.stage_utils import (
+from real_time_bp.utils.io import find_dataset_paths, load_case_index
+from real_time_bp.utils.params import load_params
+from real_time_bp.utils.progress import configure_logging
+from real_time_bp.utils.stage import (
     csv_stage_dir,
     residual_doppler_grid_hz,
     tf_candidate_grid,
     write_csv,
 )
-from real_time_bp.utils.io import find_dataset_paths, load_case_index
-from real_time_bp.utils.params import load_params
-from real_time_bp.utils.progress import configure_logging
 
 
 def main() -> None:
+    """Write dataset metadata, residual Doppler, and T_F candidate CSVs."""
     configure_logging()
     logger.info("Starting dataset summary stage")
     params = load_params()

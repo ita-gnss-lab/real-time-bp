@@ -1,3 +1,5 @@
+"""Download the Kaggle backpropagation dataset into the DVC raw-data folder."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,13 +13,16 @@ from real_time_bp.utils.progress import configure_logging
 
 
 def main() -> None:
+    """Download or refresh the configured Kaggle dataset for DVC."""
     configure_logging()
     logger.info("Starting dataset download stage")
     params = load_params()
     dataset = params.get("dataset", {})
     output_dir = PROJECT_ROOT / dataset.get("output_dir", "data/raw/backpropagation")
     output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("Downloading {} into {}", dataset.get("handle", "rodrigodlf/backpropagation"), output_dir)
+    logger.info(
+        "Downloading {} into {}", dataset.get("handle", "rodrigodlf/backpropagation"), output_dir
+    )
     # Paper: Methodology Section II.3. DVC pins this as
     # the always-changed raw-data stage so all downstream Results CSVs are tied
     # to the current Kaggle dataset version.

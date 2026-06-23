@@ -44,18 +44,26 @@ experiments:
   # T={T_F,1,...,T_F,P}, using the 0.5--2.0 s domain from the dataset design.
   tf_candidate_min_s: 0.5
   tf_candidate_max_s: 2.0
-  tf_candidate_count: 36
+  tf_candidate_count: 72
+  score_curve_n_init_samples:
+    - 512
+    - 4096
+    - 8192
+  score_curve_residual_doppler_errors_hz:
+    - 0.0
+    - 20.0
+    - 250.0
   # Paper: Results Section III.1; residual Doppler sensitivity now spans the
   # direct Delta f_D range used in the figures.
   residual_doppler_error_hz_min: 0.0
-  residual_doppler_error_hz_max: 20.0
-  residual_doppler_error_count: 21
+  residual_doppler_error_hz_max: 250.0
+  residual_doppler_error_count: 26
   representative_c_n0_db_hz: 55.0
 
 tvd:
   # Paper: Methodology Section II.2; TVD jumps are allowed only
   # at local fade minima below this intensity threshold.
-  fade_threshold_db: -15.0
+  fade_threshold_db: -10.0
   # Paper: Breitsch-style weighted TVD: low penalty at allowed fade minima.
   allowed_jump_weight: 1.0
   # Paper: Breitsch-style weighted TVD: high penalty elsewhere.
@@ -96,15 +104,20 @@ near_real_time:
   # point used for the batch vs near-real-time comparison.
   practical_fft_m: 8192
   practical_latency_samples: 4095
+  residual_doppler_error_hz_min: 0.0
+  residual_doppler_error_hz_max: 1.5
+  residual_doppler_error_count: 16
   heatmap_max_cases_per_severity: 1
   example_context_samples: 160
   example_ml_configs:
     - block_len: 2048
       latency_samples: 0
-    - block_len: 4096
+    - block_len: 2048
+      latency_samples: 256
+    - block_len: 2048
+      latency_samples: 512
+    - block_len: 2048
       latency_samples: 1024
-    - block_len: 8192
-      latency_samples: 4095
 
 plots:
   csv_dir: results/csv

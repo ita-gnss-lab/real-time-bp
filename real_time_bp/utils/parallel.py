@@ -1,3 +1,5 @@
+"""Small ordered multiprocessing helper for DVC stages."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -15,6 +17,16 @@ def ordered_parallel_map(
     *,
     workers: int,
 ) -> Iterator[R]:
+    """Map a function over an iterable while preserving input order.
+
+    Args:
+        function: Callable executed for each item.
+        iterable: Items to process.
+        workers: Number of worker processes. A value of one runs serially.
+
+    Yields:
+        Function results in the same order as the input iterable.
+    """
     worker_count = max(int(workers), 1)
     if worker_count == 1:
         for item in iterable:

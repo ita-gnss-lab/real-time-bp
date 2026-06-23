@@ -27,6 +27,7 @@ dependencies = [
     "pandas>=3.0.2",
     "pip",
     "plotly>=6.8.0",
+    "pre-commit>=4.6.0",
     "prox-tv",
     "pydynamic>=2.5.1",
     "pytest",
@@ -46,7 +47,10 @@ src = ["real_time_bp"]
 include = ["pyproject.toml", "real_time_bp/**/*.py"]
 
 [tool.ruff.lint]
-extend-select = ["I"]  # Add import sorting
+extend-select = ["D", "I"]  # Add Google docstring checks and import sorting.
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = ["real_time_bp"]
