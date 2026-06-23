@@ -24,9 +24,13 @@ from real_time_bp.utils.stage import figure_stage_dir
 
 
 def plot_near_real_time() -> None:
-    """Render VAR, latency, practical-metric, and forecast figures."""
-    # Paper: Results Section III.3, Figures 9-13. Plot group for VAR order
-    # distribution, practical metrics, M/L heatmap, and example forecasts.
+    """Render VAR, latency, practical-metric, and forecast figures.
+
+    Main paper:
+        Results Section III.3, Figures 9-13, defines this plot group for VAR
+        order distribution, practical metrics, M/L heatmap, and example
+        forecasts.
+    """
     out_dir = figure_stage_dir("04_near_real_time")
     var_orders = read_csv("04_near_real_time/near_real_time_var_orders.csv")
     practical = read_csv("04_near_real_time/near_real_time_practical_metrics.csv")
@@ -46,8 +50,12 @@ def plot_near_real_time() -> None:
 
 
 def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 10. Histogram of BIC-selected VAR orders over scintillation
-    # severities.
+    """Plot the histogram of BIC-selected VAR orders.
+
+    Main paper:
+        Results Figure 10 reports the selected VAR orders over scintillation
+        severities.
+    """
     if df.empty:
         placeholder(path, "No VAR order data")
         return
@@ -70,8 +78,12 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
 
 
 def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 12. Batch BP versus near-real-time BP at the practical M,L
-    # operating point.
+    """Plot batch BP versus near-real-time BP practical metrics.
+
+    Main paper:
+        Results Figure 12 compares the noncausal batch BP reference with the
+        practical near-real-time BP operating point.
+    """
     if df.empty:
         placeholder(path, "No practical near-real-time metric data")
         return
@@ -158,8 +170,12 @@ def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: P
 
 
 def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 11. Heatmap over FFT length M and latency L. Invalid
-    # triangular-domain cells are absent.
+    """Plot the latency and FFT-length heatmap.
+
+    Main paper:
+        Results Figure 11 evaluates FFT length M and latency L over the valid
+        triangular domain; invalid cells are absent from the heatmap.
+    """
     if df.empty:
         placeholder(path, "No latency heatmap data")
         return
@@ -251,8 +267,12 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
 
 
 def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 13. Representative phase comparison between truth, batch BP,
-    # and near-real-time BP.
+    """Plot representative phase traces for batch and near-real-time BP.
+
+    Main paper:
+        Results Figure 13 compares truth, batch BP, and near-real-time BP for
+        representative cases.
+    """
     if df.empty:
         placeholder(path, "No phase example data")
         return
@@ -342,8 +362,12 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
 
 
 def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 9. True versus VAR-forecasted real/imaginary scintillation
-    # samples for a representative case.
+    """Plot true, tracked, and VAR-forecasted scintillation samples.
+
+    Main paper:
+        Results Figure 9 compares true and VAR-forecasted real/imaginary
+        scintillation samples for a representative case.
+    """
     if df.empty:
         placeholder(path, "No forecast example data")
         return

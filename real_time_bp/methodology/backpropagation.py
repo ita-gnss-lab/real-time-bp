@@ -11,8 +11,9 @@ def propagation_kernel(
 ) -> np.ndarray:
     """Build the forward phase-screen propagation kernel.
 
-    The kernel follows the main paper methodology for the dispersive
-    phase-screen operator as a function of the Fresnel time scale.
+    Main paper:
+        Methodology Section II.1, Eq. (3), defines the all-pass dispersive
+        phase-screen propagation kernel H[f_n, T_F].
 
     Args:
         block_len: Number of samples in the FFT block.
@@ -22,8 +23,6 @@ def propagation_kernel(
     Returns:
         Complex all-pass frequency-domain propagation kernel.
     """
-    # Paper: Methodology Eq. (3). This is the all-pass
-    # dispersive phase-screen propagation kernel H[f_n, T_F].
     frequency_hz = np.fft.fftfreq(int(block_len), d=float(sample_interval_s))
     return np.exp(-0.5j * (2.0 * np.pi * frequency_hz * float(fresnel_time_scale_s)) ** 2)
 
@@ -35,6 +34,10 @@ def inverse_propagation_kernel(
 ) -> np.ndarray:
     """Build the inverse backpropagation kernel.
 
+    Main paper:
+        Methodology Section II.1, Eq. (5), defines radio BP as a matched
+        filter, so the inverse kernel is the conjugate H*[f_n, T_F_hat].
+
     Args:
         block_len: Number of samples in the FFT block.
         sample_interval_s: Sample spacing in seconds.
@@ -43,8 +46,6 @@ def inverse_propagation_kernel(
     Returns:
         Complex conjugate kernel used for radio backpropagation.
     """
-    # Paper: Methodology Eq. (5). Radio BP is a matched filter, so it
-    # applies the conjugate kernel H*[f_n, T_F_hat].
     return np.conj(propagation_kernel(block_len, sample_interval_s, fresnel_time_scale_s))
 
 
@@ -55,6 +56,11 @@ def batch_backpropagate(
 ) -> np.ndarray:
     """Apply noncausal batch backpropagation to a complete scintillation signal.
 
+    Main paper:
+        Methodology Section II.1, Eqs. (4)-(5), defines the full-record
+        noncausal BP operation. Results Section III.2 and Section III.3 use
+        this batch estimate as the reference backpropagation output.
+
     Args:
         scintillation_signal: Complex tracked scintillation signal.
         sample_interval_s: Sample spacing in seconds.
@@ -63,9 +69,6 @@ def batch_backpropagate(
     Returns:
         Complex screen-domain field estimate for the full record.
     """
-    # Paper: Methodology Eqs. (4)-(5).
-    # This full-record batch operation is the noncausal reference used in
-    # Results Section III.2 and Section III.3.
     signal = np.asarray(scintillation_signal, dtype=complex)
     kernel = inverse_propagation_kernel(signal.size, sample_interval_s, fresnel_time_scale_s)
     return ifft(fft(signal) * kernel)
@@ -78,6 +81,11 @@ def sliding_window_backpropagate_value_with_kernel(
 ) -> complex:
     """Backpropagate one block and retain the configured center sample.
 
+    Main paper:
+        Methodology Section II.5, Eq. (18), defines the sliding-window BP
+        sample. When M and T_F are fixed, the inverse propagation kernel is
+        shared across all window centers.
+
     Args:
         block: Complex input samples for one local FFT window.
         inverse_kernel: Precomputed inverse propagation kernel for the block.
@@ -86,8 +94,6 @@ def sliding_window_backpropagate_value_with_kernel(
     Returns:
         Complex backpropagated sample at `center_index`.
     """
-    # Paper: Methodology Eq. (18). When M and T_F are fixed, the inverse
-    # propagation kernel is shared across all sliding-window centers.
     kernel = np.asarray(inverse_kernel, dtype=complex)
     return ifft(fft(block) * kernel)[center_index]
 
@@ -95,14 +101,22 @@ def sliding_window_backpropagate_value_with_kernel(
 def unwrap_phase(z: np.ndarray) -> np.ndarray:
     """Unwrap the phase of finite complex samples while preserving NaNs.
 
+    Main paper:
+        Methodology Section II.1, Eq. (7), uses an unwrapped phase convention.
+        This implementation applies the Itoh-style unwrap convention through
+        `numpy.unwrap`.
+
+    Reference:
+        D. C. Ghiglia and M. D. Pritt, Two-Dimensional Phase Unwrapping:
+        Theory, Algorithms, and Software. Wiley, 1998. Accessed Jun. 15, 2026.
+        Available: https://www.wiley.com/en-fr/two-dimensional-phase-unwrapping-theory-algorithms-and-software-p-9780471249351
+
     Args:
         z: Complex-valued samples whose phase should be unwrapped.
 
     Returns:
         Real-valued phase array with NaNs where the input was not finite.
     """
-    # Paper: Methodology Eq. (7). We use
-    # Itoh-style unwrapping (numpy.unwrap), as stated in Section II.1.
     values = np.asarray(z)
     phase = np.full(values.shape, np.nan, dtype=float)
     mask = np.isfinite(values)
@@ -116,6 +130,11 @@ def median_align_phase(
 ) -> np.ndarray:
     """Remove the constant phase ambiguity using a median reference offset.
 
+    Main paper:
+        Methodology Section II.1 and Results Section III.2 use BP phase traces
+        up to an arbitrary constant phase offset. Metrics and figures remove
+        that ambiguity by aligning the median error after N_init.
+
     Args:
         phase: Estimated phase trace in radians.
         reference: Reference phase trace in radians.
@@ -124,8 +143,6 @@ def median_align_phase(
     Returns:
         Phase trace shifted by the median finite error after `start_index`.
     """
-    # Paper/results convention: BP recovers the screen phase up to an arbitrary
-    # constant phase offset, so metrics align the median error after N_init.
     phase = np.asarray(phase, dtype=float)
     reference = np.asarray(reference, dtype=float)
     aligned = phase.copy()

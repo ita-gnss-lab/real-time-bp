@@ -11,14 +11,16 @@ from real_time_bp.methodology.constants import meters_to_radians
 def estimate_sample_interval_s(case_df: pd.DataFrame) -> float:
     """Estimate the sample interval from a tracking case table.
 
+    Main paper:
+        Methodology Section II.2 writes the prompt stream at coherent
+        integration steps kT; this recovers T from each case table.
+
     Args:
         case_df: Tracking samples for one case.
 
     Returns:
         Median spacing between unique sample times in seconds.
     """
-    # Paper: Methodology Section II.2 writes the prompt stream
-    # at coherent-integration steps kT; this recovers T from each case table.
     values = np.sort(case_df["time_sec"].dropna().unique())
     if values.size < 2:
         return float("nan")
@@ -32,6 +34,11 @@ def estimated_scintillation_phase_rad(
 ) -> np.ndarray:
     """Compute the LOS-corrected tracked scintillation phase estimate.
 
+    Main paper:
+        Methodology Section II.2, Eq. (12), defines the LOS-corrected tracked
+        scintillation phase estimate. The `residual_doppler_error_hz` term is
+        the explicit sensitivity perturbation used in Section III.3.
+
     Args:
         case_df: Tracking samples for one case.
         wavelength_m: Carrier wavelength in meters.
@@ -41,11 +48,7 @@ def estimated_scintillation_phase_rad(
     Returns:
         Estimated scintillation phase in radians.
     """
-    # Paper: Methodology Eq. (12).
-    # The compact dataset stores this LOS-corrected phase directly, so this
-    # repo no longer reconstructs it from removed per-sample tracking columns.
-    # The `residual_doppler_error_hz` is an explicit sensitivity term used in
-    # Section III.3.3.
+    # The compact dataset stores this LOS-corrected phase directly.
     phase_m = case_df["estimated_scintillation_phase_m"].to_numpy(dtype=float)
     phase_rad = meters_to_radians(phase_m, wavelength_m)
     time_sec = case_df["time_sec"].to_numpy(dtype=float)
@@ -56,6 +59,10 @@ def estimated_scintillation_phase_rad(
 def true_scintillation_phase_rad(case_df: pd.DataFrame, wavelength_m: float) -> np.ndarray:
     """Load the truth scintillation phase in radians.
 
+    Main paper:
+        Methodology Section II.3 uses `scint_phase_m` as the CPSSM truth phase
+        for validation diagnostics.
+
     Args:
         case_df: Tracking samples for one case.
         wavelength_m: Carrier wavelength in meters.
@@ -63,13 +70,15 @@ def true_scintillation_phase_rad(case_df: pd.DataFrame, wavelength_m: float) -> 
     Returns:
         True propagated scintillation phase in radians.
     """
-    # Paper validation quantity: scint_phase_m is the CPSSM truth phase used
-    # in Methodology Section II.3 diagnostics.
     return meters_to_radians(case_df["scint_phase_m"].to_numpy(dtype=float), wavelength_m)
 
 
 def true_refractive_phase_rad(case_df: pd.DataFrame, wavelength_m: float) -> np.ndarray:
     """Load the truth refractive screen phase in radians.
+
+    Main paper:
+        Methodology Section II.1 names the latent screen phase phi_r[k]. The
+        `true_refractive_phase_m` column is the ground truth BP target.
 
     Args:
         case_df: Tracking samples for one case.
@@ -78,8 +87,6 @@ def true_refractive_phase_rad(case_df: pd.DataFrame, wavelength_m: float) -> np.
     Returns:
         True refractive phase in radians.
     """
-    # Paper: Methodology Section II.1 names the latent screen
-    # phase phi_r[k]; this column is the ground truth target for BP retrieval.
     return meters_to_radians(
         case_df["true_refractive_phase_m"].to_numpy(dtype=float), wavelength_m
     )
@@ -92,6 +99,10 @@ def estimated_scintillation_signal(
 ) -> np.ndarray:
     """Build the complex tracked scintillation signal used by BP.
 
+    Main paper:
+        Methodology Section II.2, Eq. (13), defines the BP input as the tracked
+        scintillation field sqrt(I[k]) exp(j * phi_s_hat[k]).
+
     Args:
         case_df: Tracking samples for one case.
         wavelength_m: Carrier wavelength in meters.
@@ -100,8 +111,6 @@ def estimated_scintillation_signal(
     Returns:
         Complex signal with tracked amplitude and LOS-corrected phase.
     """
-    # Paper: Methodology Eq. (13).
-    # The BP input is sqrt(I[k]) * exp(j * phi_s_hat[k]).
     intensity = case_df["tracked_intensity"].to_numpy(dtype=float)
     amplitude = np.sqrt(np.maximum(intensity, 0.0))
     phase = estimated_scintillation_phase_rad(
@@ -115,6 +124,11 @@ def estimated_scintillation_signal(
 def true_scintillation_signal(case_df: pd.DataFrame, wavelength_m: float) -> np.ndarray:
     """Build the noiseless truth scintillation signal.
 
+    Main paper:
+        Methodology Sections II.2-II.3 define the noiseless propagated
+        scintillation field sqrt(I_true[k]) exp(j phi_s[k]), which is used for
+        VAR forecast validation figures.
+
     Args:
         case_df: Tracking samples for one case.
         wavelength_m: Carrier wavelength in meters.
@@ -122,8 +136,6 @@ def true_scintillation_signal(case_df: pd.DataFrame, wavelength_m: float) -> np.
     Returns:
         Complex truth signal using true intensity and scintillation phase.
     """
-    # Paper validation quantity for VAR forecast figures: this is the noiseless
-    # propagated scintillation field sqrt(I_true[k]) exp(j phi_s[k]).
     intensity = case_df["true_intensity"].to_numpy(dtype=float)
     amplitude = np.sqrt(np.maximum(intensity, 0.0))
     phase = true_scintillation_phase_rad(case_df, wavelength_m)
@@ -133,14 +145,16 @@ def true_scintillation_signal(case_df: pd.DataFrame, wavelength_m: float) -> np.
 def detrended_intensity_db(case_df: pd.DataFrame) -> np.ndarray:
     """Return tracked detrended intensity in decibels.
 
+    Main paper:
+        Methodology Section II.2, Eq. (10), uses detrended scintillation
+        intensity I[k]. Plots and TVD convert that intensity to dB units.
+
     Args:
         case_df: Tracking samples for one case.
 
     Returns:
         Detrended tracked intensity in dB.
     """
-    # Paper: Methodology Eq. (10). The dataset stores
-    # the detrended scintillation intensity I[k]; plots and TVD use dB units.
     intensity = np.maximum(
         case_df["tracked_intensity"].to_numpy(dtype=float), np.finfo(float).tiny
     )

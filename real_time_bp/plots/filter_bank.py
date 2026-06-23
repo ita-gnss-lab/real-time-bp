@@ -28,9 +28,13 @@ from real_time_bp.utils.stage import figure_stage_dir
 
 
 def plot_filter_bank() -> None:
-    """Render filter-bank score, T_F error, N_init, and Doppler figures."""
-    # Paper: Results Section III.2, Figures 2-8. This group now uses only the
-    # amplitude-variability filter-bank baseline.
+    """Render filter-bank score, T_F error, N_init, and Doppler figures.
+
+    Main paper:
+        Results Section III.2, Figures 2-8, define this figure group. The
+        current pipeline uses only the amplitude-variability filter-bank
+        baseline.
+    """
     out_dir = figure_stage_dir("03_filter_bank")
     scores = read_csv("03_filter_bank/filter_bank_score_curves.csv")
     estimates = amplitude_only(read_csv("03_filter_bank/filter_bank_estimates.csv"))
@@ -46,8 +50,12 @@ def plot_filter_bank() -> None:
 
 
 def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 2. Representative weak and strong score curves over the
-    # candidate T_F grid.
+    """Plot representative weak and strong score curves over the T_F grid.
+
+    Main paper:
+        Results Figure 2 displays J(T_F) against N_init for representative
+        cases. Residual Doppler robustness is not part of this figure.
+    """
     if scores.empty:
         placeholder(path, "No filter-bank score data")
         return
@@ -67,8 +75,6 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
             pd.to_numeric(group["n_init_samples"], errors="coerce").dropna().unique()
         )
         if "residual_doppler_error_hz" in group.columns:
-            # Paper: Figure 2 now only displays J(T_F) against N_init. Residual
-            # Doppler robustness is not part of this figure.
             residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
             group = group[residual.fillna(0.0).eq(0.0)]
         n_init_cmap = plt.get_cmap(CONFIG_CMAP)
@@ -122,8 +128,12 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
 
 
 def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax) -> None:
-    # Paper: Figure 3. Selected T_F compared against true CPSSM T_F across the
-    # dataset.
+    """Draw estimated T_F boxplots against true CPSSM T_F.
+
+    Main paper:
+        Results Figure 3 compares selected T_F estimates against the true CPSSM
+        T_F across the dataset.
+    """
     if estimates.empty:
         ax.text(0.5, 0.5, "No filter-bank estimate data", ha="center", va="center")
         ax.set_axis_off()
@@ -201,8 +211,12 @@ def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax) -> None:
 
 
 def _plot_n_init_sensitivity(df: pd.DataFrame, estimates: pd.DataFrame, path: Path) -> None:
-    # Paper: Figure 4. N_init sensitivity used to justify the fixed
-    # initialization length in later filter-bank and near-real-time experiments.
+    """Plot N_init sensitivity and the T_F estimate distribution.
+
+    Main paper:
+        Results Figure 4 justifies the fixed initialization length used in
+        later filter-bank and near-real-time experiments.
+    """
     if df.empty:
         placeholder(path, "No initialization sensitivity data")
         return

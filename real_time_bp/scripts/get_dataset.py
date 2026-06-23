@@ -13,7 +13,13 @@ from real_time_bp.utils.progress import configure_logging
 
 
 def main() -> None:
-    """Download or refresh the configured Kaggle dataset for DVC."""
+    """Download or refresh the configured Kaggle dataset for DVC.
+
+    Main paper:
+        Methodology Section II.3 defines the simulated dataset consumed by the
+        pipeline. DVC pins this as the raw-data stage so downstream Results CSVs
+        are tied to the current Kaggle dataset version.
+    """
     configure_logging()
     logger.info("Starting dataset download stage")
     params = load_params()
@@ -23,9 +29,6 @@ def main() -> None:
     logger.info(
         "Downloading {} into {}", dataset.get("handle", "rodrigodlf/backpropagation"), output_dir
     )
-    # Paper: Methodology Section II.3. DVC pins this as
-    # the always-changed raw-data stage so all downstream Results CSVs are tied
-    # to the current Kaggle dataset version.
     path = kagglehub.dataset_download(
         dataset.get("handle", "rodrigodlf/backpropagation"),
         force_download=bool(dataset.get("force_download", False)),

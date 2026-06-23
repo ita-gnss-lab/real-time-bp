@@ -17,7 +17,14 @@ from real_time_bp.utils.stage import (
 
 
 def main() -> None:
-    """Write dataset metadata, residual Doppler, and T_F candidate CSVs."""
+    """Write dataset metadata, residual Doppler, and T_F candidate CSVs.
+
+    Main paper:
+        Results Section III.1 uses these summaries as source tables for
+        carrier-to-noise, severity, T_F, and dataset-path descriptions.
+        Methodology Section II.4 and Results Section III.2 use the persisted
+        candidate grid so plots and tables can be regenerated from CSV outputs.
+    """
     configure_logging()
     logger.info("Starting dataset summary stage")
     params = load_params()
@@ -26,9 +33,6 @@ def main() -> None:
     logger.info("Using dataset root {}", paths.root)
     case_index = load_case_index(paths)
 
-    # Paper: Results Section III.1. These summaries are
-    # the source tables for carrier-to-noise, severity, T_F, and dataset-path
-    # descriptions before the analysis stages run.
     if "input_c_n0_db_hz" not in case_index.columns:
         case_index["input_c_n0_db_hz"] = pd.NA
     if "rhof_veff_ratio" not in case_index.columns:
@@ -56,9 +60,6 @@ def main() -> None:
             }
         ]
     )
-    # Paper: Methodology Section II.4 and Results
-    # Section III.2; persist the exact candidate grid so plots and
-    # tables can be regenerated without recomputing configuration logic.
     tf_candidates = pd.DataFrame({"fresnel_time_candidate_s": tf_candidate_grid(params)})
 
     write_csv(dataset_paths, out_dir / "dataset_paths.csv")

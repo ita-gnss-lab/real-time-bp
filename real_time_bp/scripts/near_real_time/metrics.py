@@ -40,6 +40,12 @@ def iter_practical_tasks(
 ):
     """Yield practical BP tasks with representative-example flags.
 
+    Main paper:
+        Results Figure 13 uses the same representative cases as the TVD
+        examples, while metrics use every eligible case. Results Figure 9 uses
+        a slightly noisier strong-scintillation case for the VAR forecast
+        example.
+
     Args:
         case_iter: Iterator over `(metadata, case_df)` tracking cases.
         params: Parsed `params.yaml` dictionary.
@@ -58,8 +64,6 @@ def iter_practical_tasks(
     for metadata, case_df in case_iter:
         severity = str(metadata.get("severity"))
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
-        # Paper: Figure 13 uses the same representative cases as the TVD
-        # examples; metrics still use every eligible case.
         include_phase_example = case_id in representative_case_ids or (
             not representative_case_ids
             and is_representative_case(metadata, experiments)
@@ -68,8 +72,6 @@ def iter_practical_tasks(
         if include_phase_example:
             phase_example_severities.add(severity)
 
-        # Paper: Figure 9 shows the VAR forecast on a slightly noisier strong
-        # scintillation case than the 55 dB-Hz phase examples.
         include_forecast_example = False
         if not forecast_example_selected and severity == "strong":
             c_n0 = metadata.get("input_c_n0_db_hz")
@@ -138,6 +140,12 @@ def compute_practical_case(
 ) -> dict[str, object]:
     """Compute practical near-real-time metrics for one tracking case.
 
+    Main paper:
+        Methodology Eq. (13) defines the cleaned complex signal used by both
+        batch and windowed BP. Methodology Section II.5 fits VAR on the same
+        N_init segment used for T_F estimation. Results Figure 12 compares
+        noncausal batch BP against finite-M, finite-latency near-real-time BP.
+
     Args:
         metadata: Metadata for the tracking case.
         case_df: Tracking samples for one case.
@@ -158,8 +166,6 @@ def compute_practical_case(
     block_len = int(near_cfg.get("practical_fft_m", 8192))
     latency = int(near_cfg.get("practical_latency_samples", block_len // 2 - 1))
     sample_interval_s = estimate_sample_interval_s(case_df)
-    # Paper: Methodology Eq. (13); both
-    # batch and windowed BP operate on the same cleaned complex signal.
     signal = estimated_scintillation_signal(case_df, wavelength_m, residual_doppler_error_hz)
     true_signal = true_scintillation_signal(case_df, wavelength_m)
     estimated_scintillation_phase = estimated_scintillation_phase_rad(
@@ -168,9 +174,15 @@ def compute_practical_case(
         residual_doppler_error_hz,
     )
     true_scintillation_phase = true_scintillation_phase_rad(case_df, wavelength_m)
+    # Plot-only convention: align the displayed tracked scintillation phase to
+    # truth with the same post-N_init median rule used for BP phase estimates.
+    # This does not alter the complex signal used by BP.
+    aligned_estimated_scintillation_phase = median_align_phase(
+        estimated_scintillation_phase,
+        true_scintillation_phase,
+        n_init,
+    )
     true_phase = true_refractive_phase_rad(case_df, wavelength_m)
-    # Paper: Methodology Section II.5; fit VAR on the same N_init
-    # segment used for T_F estimation.
     features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])
     var_order, var_result = select_var_order_bic(
         features,
@@ -178,8 +190,6 @@ def compute_practical_case(
         int(near_cfg.get("var_order_max", 24)),
     )
     eval_indices = valid_eval_indices(len(case_df), block_len)
-    # Paper: Figure 12 practical comparison. Batch BP is the noncausal reference;
-    # near-real-time BP uses a finite M window and latency L.
     batch = batch_backpropagate(signal, sample_interval_s, estimated_tf)
     batch_phase = median_align_phase(unwrap_phase(batch), true_phase, n_init)
     sliding = sliding_window_bp_with_var_forecast(
@@ -206,8 +216,6 @@ def compute_practical_case(
         sample_interval_s,
     )
     practical_row = {
-        # Paper: Figure 12; these metrics feed
-        # batch-vs-near-real-time MRMSE and CS/min comparisons.
         **case_keys(metadata),
         "estimated_fresnel_time_scale_s": estimated_tf,
         "residual_doppler_error_hz": float(residual_doppler_error_hz),
@@ -243,7 +251,7 @@ def compute_practical_case(
             estimated_tf,
             var_result,
             true_scintillation_phase,
-            estimated_scintillation_phase,
+            aligned_estimated_scintillation_phase,
             true_phase,
             batch_phase,
         )

@@ -14,9 +14,12 @@ from real_time_bp.utils.stage import figure_stage_dir
 
 
 def plot_cycle_slips() -> None:
-    """Render the combined TVD and representative phase-retrieval figure."""
-    # Paper: Figure 1 diagnostic support. This visualizes the TVD integer
-    # cycle-bias trace beside the fade minima that constrain allowed jumps.
+    """Render the combined TVD and representative phase-retrieval figure.
+
+    Main paper:
+        Results Figure 1 diagnostic support visualizes the TVD integer
+        cycle-bias trace beside the fade minima that constrain allowed jumps.
+    """
     out_dir = figure_stage_dir("02_cycle_slips")
     filter_dir = figure_stage_dir("03_filter_bank")
     params = load_params()

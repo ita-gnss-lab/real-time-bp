@@ -8,14 +8,16 @@ import numpy as np
 def wrap_to_pi(x: np.ndarray) -> np.ndarray:
     """Wrap phase errors to the interval [-pi, pi).
 
+    Main paper:
+        Results Section III.2, Eq. (22), evaluates phase errors through the
+        wrapping operator W(.), so phase RMSE is not dominated by 2*pi branches.
+
     Args:
         x: Phase values or phase errors in radians.
 
     Returns:
         Wrapped phase values in radians.
     """
-    # Paper: Section III.2 Eq. (22) evaluates phase errors through a
-    # wrapping operator W(.), so phase RMSE is not dominated by 2*pi branches.
     return (np.asarray(x, dtype=float) + np.pi) % (2.0 * np.pi) - np.pi
 
 
@@ -37,13 +39,16 @@ def finite_mask(*arrays: np.ndarray) -> np.ndarray:
 def rmse(x: np.ndarray) -> float:
     """Compute root-mean-square error after dropping non-finite samples.
 
+    Main paper:
+        Results Section III.2 reports RMSE_TF and phase MRMSE using this
+        root-mean-square reduction.
+
     Args:
         x: Error samples.
 
     Returns:
         Root-mean-square value, or NaN when no finite samples exist.
     """
-    # Paper: Results Section III.2 reports RMSE_TF and phase MRMSE.
     values = np.asarray(x, dtype=float)
     values = values[np.isfinite(values)]
     if values.size == 0:
@@ -54,13 +59,15 @@ def rmse(x: np.ndarray) -> float:
 def mae(x: np.ndarray) -> float:
     """Compute mean absolute error after dropping non-finite samples.
 
+    Main paper:
+        Results Section III.2 reports MAE_TF by scintillation severity.
+
     Args:
         x: Error samples.
 
     Returns:
         Mean absolute value, or NaN when no finite samples exist.
     """
-    # Paper: Results Section III.2 requests MAE_TF by severity.
     values = np.asarray(x, dtype=float)
     values = values[np.isfinite(values)]
     if values.size == 0:
@@ -71,6 +78,9 @@ def mae(x: np.ndarray) -> float:
 def mape(reference: np.ndarray, estimate: np.ndarray) -> float:
     """Compute mean absolute percentage error.
 
+    Main paper:
+        Results Section III.2 reports MAPE_TF by scintillation severity.
+
     Args:
         reference: Reference values used in the denominator.
         estimate: Estimated values compared with `reference`.
@@ -78,7 +88,6 @@ def mape(reference: np.ndarray, estimate: np.ndarray) -> float:
     Returns:
         Mean absolute percentage error in percent, or NaN when unavailable.
     """
-    # Paper: Results Section III.2 requests MAPE_TF by severity.
     reference = np.asarray(reference, dtype=float)
     estimate = np.asarray(estimate, dtype=float)
     mask = finite_mask(reference, estimate) & (np.abs(reference) > 0)
@@ -90,6 +99,10 @@ def mape(reference: np.ndarray, estimate: np.ndarray) -> float:
 def r2_score(reference: np.ndarray, estimate: np.ndarray) -> float:
     """Compute the coefficient of determination for an estimate.
 
+    Main paper:
+        Results Section III.2 compares filter-bank estimates with R^2_TF,
+        using the true CPSSM Fresnel time scale as the reference.
+
     Args:
         reference: Reference values.
         estimate: Estimated values.
@@ -97,8 +110,6 @@ def r2_score(reference: np.ndarray, estimate: np.ndarray) -> float:
     Returns:
         R-squared value, or NaN when it is not defined.
     """
-    # Paper: Results Section III.2 compares filter-bank scores with
-    # R^2_TF, using the true CPSSM Fresnel time scale as reference.
     reference = np.asarray(reference, dtype=float)
     estimate = np.asarray(estimate, dtype=float)
     mask = finite_mask(reference, estimate)
@@ -114,6 +125,10 @@ def r2_score(reference: np.ndarray, estimate: np.ndarray) -> float:
 def phase_rmse_rad(reference_phase_rad: np.ndarray, estimate_phase_rad: np.ndarray) -> float:
     """Compute wrapped phase RMSE in radians.
 
+    Main paper:
+        Results Section III.2, Eq. (22), defines the per-case wrapped phase
+        RMSE that is later averaged into MRMSE_phi_r.
+
     Args:
         reference_phase_rad: Reference phase samples in radians.
         estimate_phase_rad: Estimated phase samples in radians.
@@ -121,8 +136,6 @@ def phase_rmse_rad(reference_phase_rad: np.ndarray, estimate_phase_rad: np.ndarr
     Returns:
         Root-mean-square wrapped phase error in radians.
     """
-    # Paper: Results Section III.2, Eq. (22). This is the per-case wrapped phase
-    # RMSE that is later averaged into MRMSE_phi_r.
     mask = finite_mask(reference_phase_rad, estimate_phase_rad)
     if not np.any(mask):
         return float("nan")
@@ -137,6 +150,10 @@ def cycle_slips_per_minute(
 ) -> tuple[int, float]:
     """Count integer-cycle phase jumps and normalize them by duration.
 
+    Main paper:
+        Results Section III.2 defines CS/min over the samples after N_init.
+        Jumps are changes in the rounded integer phase error.
+
     Args:
         reference_phase_rad: Reference phase trace in radians.
         estimate_phase_rad: Estimated phase trace in radians.
@@ -146,8 +163,6 @@ def cycle_slips_per_minute(
     Returns:
         Pair containing the integer-cycle jump count and slips per minute.
     """
-    # Paper: Results Section III.2 defines CS/min over the samples
-    # after N_init; jumps are changes in the rounded integer phase error.
     reference = np.asarray(reference_phase_rad, dtype=float)[start_index:]
     estimate = np.asarray(estimate_phase_rad, dtype=float)[start_index:]
     mask = finite_mask(reference, estimate)

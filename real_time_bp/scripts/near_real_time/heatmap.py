@@ -39,6 +39,11 @@ def compute_heatmap(
 ) -> pd.DataFrame:
     """Compute near-real-time M/L heatmap rows.
 
+    Main paper:
+        Results Figure 11 evaluates FFT length M and latency L. For each M,
+        the valid latency domain is 0 <= L <= M-M_c-1, producing the
+        triangular heatmap domain.
+
     Args:
         params: Parsed `params.yaml` dictionary.
         paths: Resolved dataset paths.
@@ -53,8 +58,6 @@ def compute_heatmap(
     rows: list[dict] = []
     selected_case_ids = select_heatmap_case_ids(params, paths)
     m_grid = _m_grid_from_params(near_cfg)
-    # Paper: Figure 11; for each M, valid
-    # latency is 0 <= L <= M-M_c-1, producing the triangular heatmap domain.
     latency_fractions = _latency_fractions_from_params(near_cfg)
     heatmap_eval_samples = max(int(near_cfg.get("heatmap_eval_samples", 32)), 1)
     chunksize = csv_chunksize_from_params(params)
@@ -109,6 +112,13 @@ def compute_heatmap(
 
 
 def _compute_heatmap_case_task(task: tuple) -> list[dict]:
+    """Compute all heatmap cells for one selected tracking case.
+
+    Main paper:
+        Methodology Eq. (20) fits one VAR model per case and reuses it across
+        all M/L heatmap cells. Methodology Eq. (18) defines each sliding-window
+        BP evaluation for the chosen FFT length M and latency L.
+    """
     (
         metadata,
         case_df,
@@ -129,8 +139,6 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
     signal = estimated_scintillation_signal(case_df, float(wavelength_m))
     true_phase = true_refractive_phase_rad(case_df, float(wavelength_m))
     n_init = min(int(experiments.get("n_init_samples", 4096)), len(case_df))
-    # Paper: Methodology Eq. (20); one VAR fit per case is reused over
-    # all M/L heatmap cells.
     features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])
     _, var_result = select_var_order_bic(
         features,
@@ -143,8 +151,6 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
         eval_indices = valid_eval_indices(len(case_df), int(block_len))
         eval_indices = thin_eval_indices(eval_indices, max_points=int(heatmap_eval_samples))
         for latency_fraction, latency in _latency_grid(future_context, latency_fractions):
-            # Paper: Methodology Eq. (18); this evaluates a
-            # single heatmap cell for the chosen FFT length M and latency L.
             sliding = sliding_window_bp_with_var_forecast(
                 signal,
                 sample_interval_s,
@@ -180,6 +186,10 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
 def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
     """Select representative case ids for the heatmap stage.
 
+    Main paper:
+        Results Figure 11 is a latency/M diagnostic, not a carrier-to-noise
+        sweep, so representative C/N0 cases are selected per severity.
+
     Args:
         params: Parsed `params.yaml` dictionary.
         paths: Resolved dataset paths.
@@ -204,9 +214,6 @@ def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
     if case_index.empty:
         return set()
 
-    # Paper: Figure 11 is a latency/M diagnostic, not a carrier-to-noise sweep.
-    # Use representative C/N0 cases so heatmap_max_cases_per_severity means
-    # one (or N) case(s) per severity rather than one per severity and C/N0 bin.
     target_c_n0 = float(experiments.get("representative_c_n0_db_hz", 30.0))
     if "input_c_n0_db_hz" in case_index.columns:
         case_index["_c_n0_distance"] = (

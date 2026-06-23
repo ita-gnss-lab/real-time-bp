@@ -43,7 +43,13 @@ VAR_RESIDUAL_DIAGNOSTICS_CSV = "near_real_time_var_residual_diagnostics.csv"
 
 
 def main() -> None:
-    """Run the near-real-time stage and write practical, heatmap, and diagnostic CSVs."""
+    """Run the near-real-time stage and write practical, heatmap, and diagnostic CSVs.
+
+    Main paper:
+        Results Section III.3 consumes the amplitude-standard-deviation T_F
+        estimate and evaluates practical near-real-time BP, residual Doppler
+        sensitivity, and the M/L latency heatmap.
+    """
     configure_logging()
     logger.info("Starting near-real-time results stage")
     params = load_params()
@@ -58,9 +64,6 @@ def main() -> None:
     representative_case_ids = set(load_representative_case_ids().values())
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
-    # Paper: Results Section III.3. This stage consumes
-    # the amplitude-standard-deviation T_F estimate and evaluates practical
-    # near-real-time BP plus the M/L latency heatmap.
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),

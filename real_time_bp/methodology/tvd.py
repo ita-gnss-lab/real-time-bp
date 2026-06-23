@@ -1,9 +1,9 @@
 """Weighted total-variation denoising helpers for cycle-slip detection.
 
 Warning:
-    This module references the Breitsch-style TVD cycle-slip procedure in
-    addition to the main paper. Include that external reference manually in
-    the paper bibliography if this implementation detail remains in the text.
+    If code that depends on Breitsch et al. (2020, Section III.C) is moved out
+    of this module, include that reference in the new code docstring if it is
+    not already present there.
 """
 
 from __future__ import annotations
@@ -14,24 +14,45 @@ from real_time_bp.methodology.constants import radians_to_cycles
 
 
 def find_fade_minima(intensity_db: np.ndarray, threshold_db: float) -> np.ndarray:
-    """Find local amplitude-fade minima eligible for TVD jumps.
+    """Find one amplitude-fade minimum per below-threshold fade segment.
+
+    This implements the fade-minimum selection used by the main paper,
+    Methodology Section II.2, for constraining TVD cycle-slip candidates.
+    Breitsch et al. (2020, Section III.C) motivates restricting TVD jumps to
+    fade minima, but does not specify the discrete minimum finder; here each
+    contiguous below-threshold fade contributes one deepest sample.
 
     Args:
         intensity_db: Detrended intensity samples in dB.
-        threshold_db: Maximum intensity value for a minimum to be considered a fade.
+        threshold_db: Maximum intensity value for a sample to belong to a fade.
 
     Returns:
-        Integer sample indices of local minima below the threshold.
+        Integer sample indices of the deepest point in each below-threshold fade.
+
+    Reference:
+        B. Breitsch, Y. T. Morton, C. Rino, and D. Xu, "GNSS Carrier
+        Phase Cycle Slips Due to Diffractive Ionosphere Scintillation:
+        Simulation and Characterization," IEEE Trans. Aerosp. Electron. Syst.,
+        vol. 56, no. 5, pp. 3632-3644, Oct. 2020,
+        doi: 10.1109/TAES.2020.2979025.
     """
-    # Paper: Methodology Section II.2 cites the TVD cycle-slip
-    # procedure of Breitsch et al. The allowed jump locations are local fade
-    # minima below the configured fade threshold.
     values = np.asarray(intensity_db, dtype=float)
-    if values.size < 3:
+    below_threshold = np.isfinite(values) & (values <= float(threshold_db))
+    if not np.any(below_threshold):
         return np.array([], dtype=int)
-    center = values[1:-1]
-    minima = (center <= values[:-2]) & (center <= values[2:]) & (center <= float(threshold_db))
-    return np.flatnonzero(minima) + 1
+
+    padded = np.concatenate(([False], below_threshold, [False]))
+    starts = np.flatnonzero(~padded[:-1] & padded[1:])
+    ends = np.flatnonzero(padded[:-1] & ~padded[1:])
+
+    minima = []
+    for start, end in zip(starts, ends, strict=True):
+        segment = values[start:end]
+        # Use the center of a flat-bottom fade instead of np.argmin's first
+        # occurrence, so quantized plateaus do not place the jump at the edge.
+        deepest = np.flatnonzero(segment == np.min(segment))
+        minima.append(start + int(deepest[deepest.size // 2]))
+    return np.asarray(minima, dtype=int)
 
 
 def tvd_weights(
@@ -42,6 +63,12 @@ def tvd_weights(
 ) -> np.ndarray:
     """Build first-difference TVD weights from fade-minimum locations.
 
+    This implements the weighted TVD constraint in the main paper,
+    Methodology Section II.2: the first-difference penalty is small at fade
+    minima and large elsewhere, so the fitted cycle-bias staircase is allowed
+    to jump only at fade minima. The fade-minimum restriction follows Breitsch
+    et al. (2020, Section III.C).
+
     Args:
         n_samples: Number of phase samples in the TVD fit.
         fade_minima: Sample indices where phase jumps are allowed.
@@ -50,10 +77,14 @@ def tvd_weights(
 
     Returns:
         Weight vector for the `n_samples - 1` first differences.
+
+    Reference:
+        B. Breitsch, Y. T. Morton, C. Rino, and D. Xu, "GNSS Carrier
+        Phase Cycle Slips Due to Diffractive Ionosphere Scintillation:
+        Simulation and Characterization," IEEE Trans. Aerosp. Electron. Syst.,
+        vol. 56, no. 5, pp. 3632-3644, Oct. 2020,
+        doi: 10.1109/TAES.2020.2979025.
     """
-    # Paper/TVD implementation detail: the Breitsch-style weighted TVD uses
-    # small penalty at fade minima and a large penalty elsewhere, so phase jumps
-    # are encouraged only where the amplitude fade makes a transition plausible.
     weights = np.full(max(int(n_samples) - 1, 0), float(blocked_jump_weight), dtype=float)
     if weights.size == 0:
         return weights
@@ -65,6 +96,16 @@ def tvd_weights(
 def weighted_tvd_fit(phase_cycles: np.ndarray, weights: np.ndarray) -> np.ndarray:
     """Solve the weighted one-dimensional TVD fit in phase cycles.
 
+    This is the optimization step used in the main paper, Methodology
+    Section II.2, to estimate the piecewise-constant integer cycle-bias signal.
+    The numerical solver is proxTV's weighted one-dimensional TVD routine.
+
+    Reference:
+        A. Barbero and S. Sra, "Fast newton-type methods for total variation
+        regularization," in Proceedings of the 28th International Conference
+        on Machine Learning, ICML'11, Bellevue, Washington, USA: Omnipress,
+        2011, pp. 313-320.
+
     Args:
         phase_cycles: Input phase error expressed in cycles.
         weights: First-difference TVD weights.
@@ -72,7 +113,6 @@ def weighted_tvd_fit(phase_cycles: np.ndarray, weights: np.ndarray) -> np.ndarra
     Returns:
         Denoised phase-bias staircase in cycles.
     """
-    # Paper: the methodology footnote points to proxTV for exact weighted TVD.
     # tv1w_1d solves the one-dimensional weighted total-variation denoising fit.
     try:
         from prox_tv import tv1w_1d
@@ -87,14 +127,20 @@ def weighted_tvd_fit(phase_cycles: np.ndarray, weights: np.ndarray) -> np.ndarra
 def quantize_tvd_cycle_bias(tvd_fit_cycles: np.ndarray) -> np.ndarray:
     """Round a TVD fit to an integer cycle-bias staircase.
 
+    This implements the post-processing in the main paper, Methodology
+    Section II.2: after TVD estimates the cycle-bias staircase, the fit is
+    shifted by a robust fractional offset and rounded to integer cycles.
+    Breitsch et al. (2020, Section III.C) also quantizes the TVD fit to
+    identify integer cycle-slip jumps, but this implementation explicitly
+    estimates and removes a global modulo-one-cycle fractional bias before
+    rounding.
+
     Args:
         tvd_fit_cycles: Continuous TVD fit in cycles.
 
     Returns:
         Integer cycle-bias samples.
     """
-    # Paper/TVD post-processing: after fitting the slowly varying cycle-bias
-    # staircase, the fit is rounded to integer cycles before differencing.
     fit = np.asarray(tvd_fit_cycles, dtype=float)
     finite = np.isfinite(fit)
     if not np.any(finite):
@@ -112,6 +158,12 @@ def detect_cycle_slips_from_tvd(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Detect cycle slips by constraining TVD jumps to amplitude fades.
 
+    This is the full cycle-slip detector from the main paper, Methodology
+    Section II.2: phase is expressed in cycles, weighted TVD estimates the
+    cycle-bias staircase, the staircase is quantized to integers, and nonzero
+    first differences of the quantized signal are reported as cycle slips. The
+    fade-minimum TVD weighting follows Breitsch et al. (2020, Section III.C).
+
     Args:
         diffractive_phase_rad: Diffractive phase estimate in radians.
         intensity_db: Detrended intensity samples in dB.
@@ -122,11 +174,14 @@ def detect_cycle_slips_from_tvd(
     Returns:
         Tuple of fade-minimum indices, integer cycle bias, and detected
         cycle-slip indices.
+
+    Reference:
+        B. Breitsch, Y. T. Morton, C. Rino, and D. Xu, "GNSS Carrier
+        Phase Cycle Slips Due to Diffractive Ionosphere Scintillation:
+        Simulation and Characterization," IEEE Trans. Aerosp. Electron. Syst.,
+        vol. 56, no. 5, pp. 3632-3644, Oct. 2020,
+        doi: 10.1109/TAES.2020.2979025.
     """
-    # Paper: Methodology Section II.2; Results
-    # Section III.2 report cycle slips/minute from these detected
-    # integer jumps. The input phase is converted to cycles because TVD models
-    # cycle-bias jumps as integer-valued steps.
     phase_cycles = radians_to_cycles(np.asarray(diffractive_phase_rad, dtype=float))
     fade_minima = find_fade_minima(intensity_db, threshold_db)
     weights = tvd_weights(
@@ -137,9 +192,7 @@ def detect_cycle_slips_from_tvd(
     )
     tvd_fit = weighted_tvd_fit(phase_cycles, weights)
     integer_cycle_bias = quantize_tvd_cycle_bias(tvd_fit)
-    valid_minima = fade_minima[fade_minima < integer_cycle_bias.size - 1]
-    jumps = integer_cycle_bias[valid_minima + 1] - integer_cycle_bias[valid_minima]
-    cycle_slip_indices = valid_minima[jumps != 0]
+    cycle_slip_indices = np.flatnonzero(np.diff(integer_cycle_bias) != 0)
     return fade_minima, integer_cycle_bias, cycle_slip_indices
 
 
@@ -151,6 +204,10 @@ def tvd_integer_bias(
     blocked_jump_weight: float,
 ) -> np.ndarray:
     """Return only the integer TVD cycle-bias estimate.
+
+    This is the cycle-bias component of the detector in the main paper,
+    Methodology Section II.2. Downstream figures use it when the integer
+    staircase itself is needed rather than only the jump locations.
 
     Args:
         phase_rad: Phase error in radians.

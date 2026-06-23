@@ -37,7 +37,8 @@ def phase_example_rows(
         estimated_tf: Estimated Fresnel time scale in seconds.
         var_result: Fitted VAR result used for future-context forecasts.
         true_scintillation_phase: Truth propagated scintillation phase.
-        estimated_scintillation_phase: LOS-corrected tracked phase estimate.
+        estimated_scintillation_phase: LOS-corrected tracked phase estimate
+            after removing the plot-only constant phase offset.
         true_phase: Truth refractive screen phase.
         batch_phase: Batch backpropagated refractive phase estimate.
 
@@ -126,9 +127,13 @@ def _finite_tvd_integer_bias(
     intensity_db: np.ndarray,
     tvd_cfg: dict,
 ) -> np.ndarray:
-    # Paper: Figure 13 uses sliding-window BP traces, which are only defined
-    # where the selected M,L window can be evaluated. TVD is therefore fit on
-    # finite trace samples only, preserving NaNs outside the sliding support.
+    """Fit TVD only on finite sliding-window phase samples.
+
+    Main paper:
+        Results Figure 13 uses sliding-window BP traces, which are only defined
+        where the selected M,L window can be evaluated. TVD is therefore fit on
+        finite trace samples only, preserving NaNs outside the sliding support.
+    """
     output = np.full(np.asarray(phase_error).shape, np.nan, dtype=float)
     finite = np.isfinite(phase_error) & np.isfinite(intensity_db)
     if np.count_nonzero(finite) < 2:
@@ -152,6 +157,12 @@ def forecast_example_rows(
 ) -> list[dict]:
     """Build rows for the VAR forecast example figure.
 
+    Main paper:
+        Results Figure 9 exports true versus VAR-forecasted real/imaginary
+        scintillation samples for several latency values. The practical L may
+        equal the full future context, where no future samples remain to
+        forecast, so this figure uses a sweep.
+
     Args:
         metadata: Metadata for the selected tracking case.
         case_df: Tracking samples for one case.
@@ -164,9 +175,6 @@ def forecast_example_rows(
         List of CSV rows comparing true, tracked, and forecasted real/imaginary
         samples after each forecast start.
     """
-    # Paper: Figure 9; export true vs VAR-forecasted real/imaginary samples for
-    # several latency values. The practical L may equal the full future context,
-    # where no future samples remain to forecast, so this figure uses a sweep.
     center = len(case_df) // 2
     half = int(block_len) // 2
     future_context = int(block_len) - half - 1

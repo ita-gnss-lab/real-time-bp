@@ -21,11 +21,13 @@ NEAR_REAL_TIME_TRACKING_COLUMNS = {
 def load_amplitude_tf_estimates() -> dict[int, float]:
     """Load amplitude-score Fresnel-time estimates from filter-bank results.
 
+    Main paper:
+        Results Section III.3 explicitly uses the amplitude standard-deviation
+        baseline from Methodology Section II.4.
+
     Returns:
         Mapping from tracking case identifier to estimated Fresnel time scale.
     """
-    # Paper: Results Section III.3 explicitly uses the
-    # amplitude standard-deviation baseline from Section II.4.
     path = CSV_RESULTS_DIR / "03_filter_bank" / "filter_bank_estimates.csv"
     if not path.exists():
         return {}
@@ -41,6 +43,10 @@ def load_amplitude_tf_estimates() -> dict[int, float]:
 def valid_eval_indices(n_samples: int, block_len: int) -> np.ndarray:
     """Return sample indices with full sliding-window support.
 
+    Main paper:
+        Methodology Eq. (18) excludes edge samples without full past/future
+        block support from near-real-time BP evaluation.
+
     Args:
         n_samples: Total number of samples in the case.
         block_len: Sliding FFT block length.
@@ -48,8 +54,6 @@ def valid_eval_indices(n_samples: int, block_len: int) -> np.ndarray:
     Returns:
         Integer indices where the near-real-time BP window can be evaluated.
     """
-    # Paper: Methodology Eq. (18); edge samples without the full
-    # past/future block support are excluded from near-real-time evaluation.
     half = int(block_len) // 2
     future_context = int(block_len) - half - 1
     return np.arange(half, max(half, int(n_samples) - future_context), dtype=int)
@@ -57,6 +61,10 @@ def valid_eval_indices(n_samples: int, block_len: int) -> np.ndarray:
 
 def thin_eval_indices(indices: np.ndarray, max_points: int) -> np.ndarray:
     """Subsample evaluation indices for expensive diagnostic sweeps.
+
+    Implementation:
+        Results heatmaps can be expensive; thinning keeps the M/L sweep
+        tractable while preserving the triangular grid definition.
 
     Args:
         indices: Candidate evaluation indices.
@@ -66,8 +74,6 @@ def thin_eval_indices(indices: np.ndarray, max_points: int) -> np.ndarray:
         Original indices when already short enough, otherwise evenly spaced
         samples over the same span.
     """
-    # Implementation note for Results heatmaps: thinning keeps the M/L sweep
-    # tractable while preserving the triangular grid definition.
     if indices.size <= max_points:
         return indices
     positions = np.linspace(0, indices.size - 1, int(max_points), dtype=int)

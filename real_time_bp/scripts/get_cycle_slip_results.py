@@ -6,6 +6,7 @@ from loguru import logger
 import numpy as np
 import pandas as pd
 
+from real_time_bp.methodology.backpropagation import median_align_phase
 from real_time_bp.methodology.signal_model import (
     detrended_intensity_db,
     estimated_scintillation_phase_rad,
@@ -120,7 +121,13 @@ TRACES_CSV = "tvd_example_traces.csv"
 
 
 def main() -> None:
-    """Run the TVD cycle-slip stage and write events, summaries, and traces."""
+    """Run the TVD cycle-slip stage and write events, summaries, and traces.
+
+    Main paper:
+        Methodology Section II.2 isolates TVD cycle-slip detection from later
+        BP/filter-bank experiments. Results CSVs are exported separately so
+        slips and traces can be plotted or processed independently.
+    """
     configure_logging()
     logger.info("Starting TVD cycle-slip stage")
     params = load_params()
@@ -135,9 +142,6 @@ def main() -> None:
     write_batch_rows = csv_write_batch_rows_from_params(params)
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
-    # Paper: Methodology Section II.2. This DVC stage isolates
-    # TVD cycle-slip detection from later BP/filter-bank experiments so Results
-    # can report slips and export tikz/matplotlib-ready CSVs independently.
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),
@@ -212,6 +216,7 @@ def main() -> None:
             trace_case_iter,
             selected_case_ids,
             float(wavelength_m),
+            int(experiments.get("n_init_samples", 4096)),
             float(tvd_cfg.get("fade_threshold_db", -15.0)),
             float(tvd_cfg.get("allowed_jump_weight", 1.0)),
             float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
@@ -233,6 +238,16 @@ def _iter_tvd_tasks(case_iter, tvd_cfg: dict, wavelength_m: float):
 
 
 def _compute_tvd_case(task: tuple) -> dict[str, object]:
+    """Compute TVD cycle-slip events and one summary row for a case.
+
+    Main paper:
+        Methodology Eq. (12) supplies the LOS-corrected phase before removing
+        the known refractive component for the diffractive-phase TVD input.
+        Methodology Section II.2 and Breitsch et al. (2020, Section III.C)
+        define slips as nonzero first differences of the rounded TVD
+        cycle-bias staircase. Results Section III.2 uses the summary row for
+        CS/min, phase-slope diagnostics, and per-condition aggregation.
+    """
     (
         metadata,
         case_df,
@@ -243,9 +258,6 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
     ) = task
     time_sec = case_df["time_sec"].to_numpy(dtype=float)
     intensity_db = detrended_intensity_db(case_df)
-    # Paper: Methodology Eq. (12); subtract
-    # the stored LOS phase before removing the known refractive component for
-    # the diffractive-phase TVD input.
     estimated_phase = estimated_scintillation_phase_rad(case_df, float(wavelength_m))
     true_refractive = true_refractive_phase_rad(case_df, float(wavelength_m))
     diffractive_phase = estimated_phase - true_refractive
@@ -264,8 +276,6 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         include_true_fresnel_time=True,
     )
 
-    # Paper/TVD output convention: slips are recorded at fade minima where the
-    # rounded TVD cycle-bias staircase changes by a nonzero integer.
     event_rows = []
     for idx in cycle_slip_indices:
         jump_to_idx = min(int(idx) + 1, integer_cycle_bias.size - 1)
@@ -283,8 +293,6 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         )
 
     duration_min = (time_sec[-1] - time_sec[0]) / 60.0 if time_sec.size > 1 else np.nan
-    # Paper: Results Section III.2; this summary supports CS/min,
-    # phase-slope diagnostics, and per-condition aggregation.
     summary_row = {
         **metadata_keys,
         "n_samples": int(case_df.shape[0]),
@@ -314,6 +322,7 @@ def _iter_representative_tvd_traces(
     case_iter,
     selected_case_ids: set[int],
     wavelength_m: float,
+    n_init: int,
     threshold_db: float,
     allowed_jump_weight: float,
     blocked_jump_weight: float,
@@ -327,6 +336,7 @@ def _iter_representative_tvd_traces(
             metadata,
             case_df,
             wavelength_m,
+            n_init,
             threshold_db,
             allowed_jump_weight,
             blocked_jump_weight,
@@ -340,6 +350,7 @@ def _compute_tvd_trace_rows(
     metadata: dict,
     case_df,
     wavelength_m: float,
+    n_init: int,
     threshold_db: float,
     allowed_jump_weight: float,
     blocked_jump_weight: float,
@@ -348,10 +359,18 @@ def _compute_tvd_trace_rows(
     estimated_phase = estimated_scintillation_phase_rad(case_df, float(wavelength_m))
     true_scintillation = true_scintillation_phase_rad(case_df, float(wavelength_m))
     true_refractive = true_refractive_phase_rad(case_df, float(wavelength_m))
-    estimated_diffractive_cycles = (estimated_phase - true_refractive) / (2.0 * np.pi)
+    # Plot-only convention: remove the arbitrary carrier-phase constant from
+    # the displayed scintillation phase. The event detector uses the same fade
+    # minima because constant phase offsets do not change jump locations.
+    aligned_estimated_phase = median_align_phase(
+        estimated_phase,
+        true_scintillation,
+        min(int(n_init), len(case_df)),
+    )
+    estimated_diffractive_cycles = (aligned_estimated_phase - true_refractive) / (2.0 * np.pi)
     true_diffractive_cycles = (true_scintillation - true_refractive) / (2.0 * np.pi)
     fade_minima, integer_cycle_bias, _ = detect_cycle_slips_from_tvd(
-        estimated_phase - true_refractive,
+        aligned_estimated_phase - true_refractive,
         intensity_db,
         float(threshold_db),
         float(allowed_jump_weight),

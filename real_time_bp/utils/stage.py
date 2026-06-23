@@ -70,14 +70,17 @@ def optional_int(value: Any) -> int | None:
 def l1_wavelength_from_params(params: dict[str, Any]) -> float:
     """Read GPS L1 wavelength from the constants parameter block.
 
+    Main paper:
+        Results Section III.1 uses the L1 wavelength to convert phase meters to
+        radians/cycles and residual geometric-rate errors Delta G to residual
+        Doppler errors Delta f_D.
+
     Args:
         params: Parsed `params.yaml` dictionary.
 
     Returns:
         L1 carrier wavelength in meters.
     """
-    # Paper: Results Section III.1; L1 wavelength is used
-    # to convert phase meters to radians/cycles and Delta G to Delta f_D.
     constants = params.get("constants", {})
     return carrier_wavelength_m(
         constants.get("speed_of_light_m_s", 299792458.0),
@@ -88,15 +91,17 @@ def l1_wavelength_from_params(params: dict[str, Any]) -> float:
 def residual_doppler_grid_hz(params: dict[str, Any]) -> pd.DataFrame:
     """Build the residual Doppler sensitivity grid.
 
+    Main paper:
+        Results Section III.1 specifies residual Doppler sensitivity in terms
+        of geometric-rate error Delta G and converts it to
+        Delta f_D = Delta G / lambda for L1.
+
     Args:
         params: Parsed `params.yaml` dictionary.
 
     Returns:
         DataFrame with residual geometric error and Doppler error columns.
     """
-    # Paper: Results Section III.1. The residual Doppler
-    # sensitivity grid is specified as geometric-rate error Delta G in m/s and
-    # converted to Delta f_D=Delta G/lambda for L1.
     experiments = params.get("experiments", {})
     wavelength = l1_wavelength_from_params(params)
     if "residual_doppler_error_hz_max" in experiments:
@@ -124,14 +129,16 @@ def residual_doppler_grid_hz(params: dict[str, Any]) -> pd.DataFrame:
 def tf_candidate_grid(params: dict[str, Any]) -> np.ndarray:
     """Build the Fresnel-time candidate grid from experiment parameters.
 
+    Main paper:
+        Methodology Section II.4 defines the candidate set
+        T={T_F,1,...,T_F,P} used by the filter-bank score.
+
     Args:
         params: Parsed `params.yaml` dictionary.
 
     Returns:
         Candidate Fresnel time scales in seconds.
     """
-    # Paper: Methodology Section II.4; this constructs the
-    # candidate set T={T_F,1,...,T_F,P} used by every filter-bank score.
     experiments = params.get("experiments", {})
     return np.linspace(
         float(experiments.get("tf_candidate_min_s", 0.5)),
@@ -196,14 +203,16 @@ def csv_write_batch_rows_from_params(params: dict[str, Any]) -> int:
 def parallel_workers_from_params(params: dict[str, Any]) -> int:
     """Read the shared worker count from runtime parameters.
 
+    Implementation:
+        All DVC stages share this one process count so runtime tuning does not
+        change the methodology semantics.
+
     Args:
         params: Parsed `params.yaml` dictionary.
 
     Returns:
         Positive worker count.
     """
-    # Implementation note for DVC stages: all paper experiments share this one
-    # process count so runtime tuning does not change methodology semantics.
     runtime = params.get("runtime", {})
     value = runtime.get("parallel_workers", 1)
     if value is None or value == "":

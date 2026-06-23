@@ -75,7 +75,13 @@ RESIDUAL_DOPPLER_SENSITIVITY_CSV = "filter_bank_residual_doppler_sensitivity.csv
 
 
 def main() -> None:
-    """Run the filter-bank stage and write score, estimate, and metric CSVs."""
+    """Run the filter-bank stage and write score, estimate, and metric CSVs.
+
+    Main paper:
+        Results Section III.2 separates the amplitude score curve, T_F
+        estimates, downstream phase metrics, and N_init sensitivity into
+        independently plottable CSV outputs.
+    """
     configure_logging()
     logger.info("Starting filter-bank results stage")
     params = load_params()
@@ -92,9 +98,6 @@ def main() -> None:
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
-    # Paper: Results Section III.2. This stage generates separate CSVs for the
-    # amplitude score curve, T_F estimates, downstream phase metrics, and
-    # N_init sensitivity.
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),
@@ -180,10 +183,17 @@ def _compute_case_filter_bank(
     score_residual_doppler_errors_hz: list[float] | None = None,
     include_trace: bool = False,
 ) -> dict[str, list[dict]]:
+    """Compute filter-bank score, T_F estimate, metrics, and trace rows.
+
+    Main paper:
+        Methodology Eq. (13) defines the estimated complex scintillation signal
+        used by the filter bank. Methodology Section II.4 scores only the first
+        N_init samples for each candidate T_F. Results Section III.2 uses the
+        emitted rows for score curves, T_F error metrics, downstream phase
+        metrics, and representative phase-retrieval traces.
+    """
     sample_interval_s = estimate_sample_interval_s(case_df)
     n_init = min(int(n_init), len(case_df))
-    # Paper: Methodology Eq. (13); the
-    # filter bank always operates on the estimated complex scintillation signal.
     signal = estimated_scintillation_signal(case_df, wavelength_m, residual_doppler_error_hz)
     estimated_scintillation_phase = estimated_scintillation_phase_rad(
         case_df,
@@ -193,8 +203,6 @@ def _compute_case_filter_bank(
     true_scintillation_phase = true_scintillation_phase_rad(case_df, wavelength_m)
     true_phase = true_refractive_phase_rad(case_df, wavelength_m)
     init_signal = signal[:n_init]
-    # Paper: Methodology Section II.4. Only the first N_init
-    # samples are used to score each candidate T_F.
     primary_score_curve = compute_filter_bank_score(
         init_signal,
         sample_interval_s,
@@ -236,8 +244,6 @@ def _compute_case_filter_bank(
     for (score_n_init, score_residual_doppler), score_curve in sorted(score_curve_by_spec.items()):
         estimated_score_tf = select_fresnel_time_estimate(candidates, score_curve)
         for i, candidate in enumerate(candidates):
-            # Paper: Figure 2 needs every candidate value for the amplitude
-            # score, including the N_init sweep for representative examples.
             row = {
                 **base,
                 "true_fresnel_time_scale_s": true_tf,
@@ -253,8 +259,6 @@ def _compute_case_filter_bank(
     estimate_rows = []
     downstream_rows = []
     trace_rows = []
-    # Paper: Figure 3 and the Section III.2 metrics table use these rows
-    # for MAE, MAPE, RMSE_TF, R^2_TF, and worst-case diagnostics.
     estimate_rows.append(
         {
             **base,
@@ -267,8 +271,6 @@ def _compute_case_filter_bank(
             "selected_candidate_index": int(np.nanargmin(primary_score_curve)),
         }
     )
-    # Paper: Results downstream metrics. After estimating T_F, run batch BP
-    # over the full case and compare the recovered screen phase to truth.
     backpropagated = batch_backpropagate(signal, sample_interval_s, estimated_tf)
     phase = median_align_phase(unwrap_phase(backpropagated), true_phase, n_init)
     phase_rmse = phase_rmse_rad(true_phase[n_init:], phase[n_init:])
@@ -289,10 +291,16 @@ def _compute_case_filter_bank(
         }
     )
     if include_trace:
-        # Paper: Figure 5 uses the amplitude-only baseline from Section II.4
-        # for representative phase-retrieval traces.
         intensity_db = detrended_intensity_db(case_df)
         tvd_cfg = params.get("tvd", {})
+        # Plot-only convention: align the displayed tracked scintillation phase
+        # to truth with the same post-N_init median rule used for BP estimates.
+        # This only removes the arbitrary phase constant.
+        aligned_estimated_scintillation_phase = median_align_phase(
+            estimated_scintillation_phase,
+            true_scintillation_phase,
+            n_init,
+        )
         batch_phase_error = phase - true_phase
         batch_integer_cycle_bias = tvd_integer_bias(
             batch_phase_error,
@@ -308,7 +316,9 @@ def _compute_case_filter_bank(
                 lambda idx: {
                     "intensity_db": float(intensity_db[idx]),
                     "true_scintillation_phase_rad": float(true_scintillation_phase[idx]),
-                    "estimated_scintillation_phase_rad": float(estimated_scintillation_phase[idx]),
+                    "estimated_scintillation_phase_rad": float(
+                        aligned_estimated_scintillation_phase[idx]
+                    ),
                     "true_refractive_phase_rad": float(true_phase[idx]),
                     "backpropagated_refractive_phase_rad": float(phase[idx]),
                     "backpropagated_phase_rad": float(phase[idx]),
@@ -316,7 +326,7 @@ def _compute_case_filter_bank(
                         true_scintillation_phase[idx] - true_phase[idx]
                     ),
                     "estimated_scintillation_minus_refractive_rad": float(
-                        estimated_scintillation_phase[idx] - true_phase[idx]
+                        aligned_estimated_scintillation_phase[idx] - true_phase[idx]
                     ),
                     "phase_error_rad": float(phase[idx] - true_phase[idx]),
                     "batch_refractive_phase_error_rad": float(batch_phase_error[idx]),
@@ -349,14 +359,19 @@ def _iter_filter_bank_tasks(
     experiments: dict | None = None,
     representative_case_ids: set[int] | None = None,
 ):
+    """Yield filter-bank case tasks with representative trace selection.
+
+    Main paper:
+        Results Figure 2 uses one representative score curve per severity at
+        the configured carrier-to-noise ratio, while Section III.2 metrics use
+        all eligible cases.
+    """
     traced_severities: set[str] = set()
     experiments = experiments or {}
     representative_case_ids = representative_case_ids or set()
     for metadata, case_df in case_iter:
         severity = str(metadata.get("severity"))
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
-        # Paper: Figure 2 representative score curves are one per severity at the
-        # configured carrier-to-noise ratio, while metrics use all cases.
         include_trace = include_representative_traces and (
             case_id in representative_case_ids
             or (
@@ -414,6 +429,12 @@ def _compute_n_init_sensitivity(
     candidates: np.ndarray,
     wavelength_m: float,
 ) -> pd.DataFrame:
+    """Compute the N_init sensitivity table.
+
+    Main paper:
+        Results Figure 4 sweeps N_init to justify the fixed initialization
+        length used by the later filter-bank and near-real-time experiments.
+    """
     experiments = params.get("experiments", {})
     rows: list[dict] = []
     max_cases = optional_int(experiments.get("n_init_sweep_max_cases_per_condition"))
@@ -421,8 +442,6 @@ def _compute_n_init_sensitivity(
     workers = parallel_workers_from_params(params)
     for n_init in experiments.get("n_init_sweep_samples", [4096]):
         logger.info("Computing N_init sensitivity for N_init={}", n_init)
-        # Paper: Figure 4; sweep N_init to justify the
-        # fixed initialization length used elsewhere.
         estimate_rows: list[dict] = []
         downstream_rows: list[dict] = []
         case_iter = iter_case_dataframes(
