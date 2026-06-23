@@ -51,15 +51,13 @@ from real_time_bp.utils.stage import (
     l1_wavelength_from_params,
     optional_int,
     parallel_workers_from_params,
-    residual_doppler_grid_hz,
     tf_candidate_grid,
     write_csv,
     write_sorted_csv,
 )
 
 FILTER_BANK_TRACKING_COLUMNS = {
-    "carrier_phase_est_m",
-    "los_phase_m",
+    "estimated_scintillation_phase_m",
     "scint_phase_m",
     "time_sec",
     "tracked_intensity",
@@ -95,8 +93,8 @@ def main() -> None:
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
     # Paper: Results Section III.2. This stage generates separate CSVs for the
-    # amplitude score curve, T_F estimates, downstream phase metrics, N_init
-    # sensitivity, and residual-Doppler sensitivity.
+    # amplitude score curve, T_F estimates, downstream phase metrics, and
+    # N_init sensitivity.
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),
@@ -164,10 +162,9 @@ def main() -> None:
         _compute_n_init_sensitivity(params, paths, candidates, wavelength_m),
         out_dir / N_INIT_SENSITIVITY_CSV,
     )
-    write_csv(
-        _compute_residual_doppler_sensitivity(params, paths, candidates, wavelength_m),
-        out_dir / RESIDUAL_DOPPLER_SENSITIVITY_CSV,
-    )
+    stale_residual_csv = out_dir / RESIDUAL_DOPPLER_SENSITIVITY_CSV
+    if stale_residual_csv.exists():
+        stale_residual_csv.unlink()
     logger.info("Finished filter-bank results stage")
 
 
@@ -488,109 +485,18 @@ def _compute_n_init_sensitivity(
     return sort_by_severity(pd.DataFrame(rows), ["n_init_samples"])
 
 
-def _compute_residual_doppler_sensitivity(
-    params: dict,
-    paths,
-    candidates: np.ndarray,
-    wavelength_m: float,
-) -> pd.DataFrame:
-    experiments = params.get("experiments", {})
-    rows: list[dict] = []
-    max_cases = optional_int(experiments.get("residual_max_cases_per_condition"))
-    chunksize = csv_chunksize_from_params(params)
-    workers = parallel_workers_from_params(params)
-    residual_grid = residual_doppler_grid_hz(params)
-    n_init_values = _residual_n_init_samples(experiments)
-    for n_init in n_init_values:
-        logger.info("Computing residual Doppler sensitivity for N_init={}", n_init)
-        for _, residual_row in residual_grid.iterrows():
-            # Paper: Figure 6; inject a known residual Doppler term to quantify
-            # sensitivity to imperfect LOS cleanup.
-            logger.info(
-                "Computing residual Doppler sensitivity for {:.4f} m/s ({:.4f} Hz)",
-                float(residual_row["residual_geometric_error_mps"]),
-                float(residual_row["residual_doppler_error_hz"]),
-            )
-            estimate_rows: list[dict] = []
-            case_iter = iter_case_dataframes(
-                paths,
-                severities=experiments.get("severities"),
-                max_cases_per_condition=max_cases,
-                chunksize=chunksize,
-                columns=FILTER_BANK_TRACKING_COLUMNS,
-            )
-            task_iter = _iter_filter_bank_tasks(
-                case_iter,
-                params,
-                candidates,
-                wavelength_m,
-                residual_doppler_error_hz=float(residual_row["residual_doppler_error_hz"]),
-                n_init=int(n_init),
-                score_n_init_samples=None,
-                score_residual_doppler_errors_hz=None,
-            )
-            result_iter = ordered_parallel_map(
-                _compute_case_filter_bank_task,
-                task_iter,
-                workers=workers,
-            )
-            total_cases = count_cases(
-                paths,
-                severities=experiments.get("severities"),
-                max_cases_per_condition=max_cases,
-            )
-            for result in progress_iter(
-                result_iter,
-                desc=f"N_init={n_init}, residual {float(residual_row['residual_doppler_error_hz']):.2f} Hz",
-                total=total_cases,
-                unit="case",
-            ):
-                estimate_rows.extend(result["estimate_rows"])
-            estimates = pd.DataFrame(estimate_rows)
-            if estimates.empty:
-                continue
-            for severity, group in severity_groups(estimates):
-                rows.append(
-                    {
-                        "n_init_samples": int(n_init),
-                        "residual_geometric_error_mps": float(
-                            residual_row["residual_geometric_error_mps"]
-                        ),
-                        "residual_doppler_error_hz": float(
-                            residual_row["residual_doppler_error_hz"]
-                        ),
-                        "severity": severity,
-                        "rmse_fresnel_time_scale_s": rmse(
-                            group["fresnel_time_error_s"].to_numpy()
-                        ),
-                        "r2_fresnel_time_scale": r2_score(
-                            group["true_fresnel_time_scale_s"].to_numpy(),
-                            group["estimated_fresnel_time_scale_s"].to_numpy(),
-                        ),
-                    }
-                )
-    return sort_by_severity(
-        pd.DataFrame(rows),
-        ["n_init_samples", "residual_doppler_error_hz"],
-    )
-
-
 def _score_curve_n_init_samples(experiments: dict) -> list[int]:
     values = experiments.get("score_curve_n_init_samples")
     if values:
         return sorted({int(value) for value in values})
-    return [512, int(experiments.get("n_init_samples", 4096)), 8192]
+    return [512, 1024, int(experiments.get("n_init_samples", 4096))]
 
 
 def _score_curve_residual_doppler_errors_hz(experiments: dict) -> list[float]:
     values = experiments.get("score_curve_residual_doppler_errors_hz")
     if values:
         return sorted({float(value) for value in values})
-    return [0.0, 20.0, 250.0]
-
-
-def _residual_n_init_samples(experiments: dict) -> list[int]:
-    return [int(experiments.get("n_init_samples", 4096))]
+    return [0.0]
 
 
 def _aggregate_tf_error_metrics(estimates: pd.DataFrame) -> pd.DataFrame:

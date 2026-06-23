@@ -18,7 +18,6 @@ experiments:
   # by scintillation severity and carrier-to-noise ratio.
   severities:
     - weak
-    - moderate
     - strong
   # Paper: Methodology Section II.4; N_init is the initial
   # segment used both to estimate T_F and to fit the VAR model.
@@ -47,14 +46,11 @@ experiments:
   tf_candidate_count: 72
   score_curve_n_init_samples:
     - 512
+    - 1024
     - 4096
-    - 8192
   score_curve_residual_doppler_errors_hz:
     - 0.0
-    - 20.0
-    - 250.0
-  # Paper: Results Section III.1; residual Doppler sensitivity now spans the
-  # direct Delta f_D range used in the figures.
+  # Dataset-summary residual-Doppler grid retained for reproducibility checks.
   residual_doppler_error_hz_min: 0.0
   residual_doppler_error_hz_max: 250.0
   residual_doppler_error_count: 26
@@ -90,12 +86,13 @@ near_real_time:
   # across different M without mixing incompatible absolute sample counts.
   heatmap_latency_fractions:
     - 0.0
-    - 0.03125
-    - 0.0625
     - 0.125
     - 0.25
+    - 0.375
     - 0.5
+    - 0.625
     - 0.75
+    - 0.875
     - 1.0
   # Paper: Figure 11 is an aggregate diagnostic; this many evenly spaced
   # time samples are evaluated per M/L cell to keep the DVC stage tractable.
@@ -108,16 +105,13 @@ near_real_time:
   residual_doppler_error_hz_max: 1.5
   residual_doppler_error_count: 16
   heatmap_max_cases_per_severity: 1
+  forecast_example_c_n0_db_hz: 53.214286
   example_context_samples: 160
   example_ml_configs:
     - block_len: 2048
       latency_samples: 0
     - block_len: 2048
-      latency_samples: 256
-    - block_len: 2048
       latency_samples: 512
-    - block_len: 2048
-      latency_samples: 1024
 
 plots:
   csv_dir: results/csv

@@ -33,8 +33,7 @@ from real_time_bp.utils.stage import (
 )
 
 TVD_TRACKING_COLUMNS = {
-    "carrier_phase_est_m",
-    "los_phase_m",
+    "estimated_scintillation_phase_m",
     "scint_phase_m",
     "time_sec",
     "tracked_intensity",

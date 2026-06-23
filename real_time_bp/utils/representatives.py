@@ -8,10 +8,9 @@ import pandas as pd
 
 from real_time_bp.config import CSV_RESULTS_DIR
 
-SEVERITY_ORDER = ("weak", "moderate", "strong")
+SEVERITY_ORDER = ("weak", "strong")
 SEVERITY_COLORS = {
     "weak": "tab:green",
-    "moderate": "tab:orange",
     "strong": "tab:red",
 }
 
@@ -29,20 +28,18 @@ def bool_series(series: pd.Series) -> pd.Series:
 
 
 def ordered_severities(df: pd.DataFrame) -> list[str]:
-    """Return severities in paper order, followed by unexpected values.
+    """Return available severities in the configured paper order.
 
     Args:
         df: DataFrame with an optional `severity` column.
 
     Returns:
-        Ordered severity labels present in the DataFrame.
+        Ordered weak/strong severity labels present in the DataFrame.
     """
     if df.empty or "severity" not in df.columns:
         return []
     present = {str(value) for value in df["severity"].dropna().unique()}
-    ordered = [severity for severity in SEVERITY_ORDER if severity in present]
-    ordered.extend(sorted(present - set(ordered)))
-    return ordered
+    return [severity for severity in SEVERITY_ORDER if severity in present]
 
 
 def severity_groups(df: pd.DataFrame):
@@ -60,26 +57,30 @@ def severity_groups(df: pd.DataFrame):
 
 
 def sort_by_severity(df: pd.DataFrame, extra_columns: list[str] | None = None) -> pd.DataFrame:
-    """Sort a DataFrame by weak, moderate, strong severity order.
+    """Sort and filter a DataFrame by weak/strong severity order.
 
     Args:
         df: DataFrame containing an optional `severity` column.
         extra_columns: Additional columns used after severity ordering.
 
     Returns:
-        Sorted DataFrame, or the original DataFrame when severity is absent.
+        Sorted DataFrame with only configured severities, or the original
+        DataFrame when severity is absent.
     """
     if df.empty or "severity" not in df.columns:
         return df
     extra_columns = extra_columns or []
-    ordered = pd.Categorical(df["severity"].astype(str), categories=SEVERITY_ORDER, ordered=True)
+    filtered = df[df["severity"].astype(str).isin(SEVERITY_ORDER)].copy()
+    ordered = pd.Categorical(
+        filtered["severity"].astype(str), categories=SEVERITY_ORDER, ordered=True
+    )
     sort_columns = [
         column
         for column in ["_severity_order", *extra_columns]
-        if column == "_severity_order" or column in df.columns
+        if column == "_severity_order" or column in filtered.columns
     ]
     return (
-        df.assign(_severity_order=ordered)
+        filtered.assign(_severity_order=ordered)
         .sort_values(sort_columns)
         .drop(columns="_severity_order")
     )
@@ -103,5 +104,5 @@ def load_representative_case_ids(csv_dir: Path = CSV_RESULTS_DIR) -> dict[str, i
     return {
         str(row.severity): int(row.tracking_case_id)
         for row in sort_by_severity(df).itertuples()
-        if pd.notna(row.tracking_case_id)
+        if str(row.severity) in SEVERITY_ORDER and pd.notna(row.tracking_case_id)
     }

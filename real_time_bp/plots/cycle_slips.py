@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from real_time_bp.plots.common import amplitude_only, column, placeholder, read_csv
+from real_time_bp.plots.common import amplitude_only, column, placeholder, read_csv, remove_figure
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import COLORS, grid_figure_size
 from real_time_bp.utils.representatives import SEVERITY_ORDER, bool_series
@@ -27,7 +27,7 @@ def plot_cycle_slips() -> None:
     )
     if trace.empty:
         placeholder(out_dir / "tvd_example_traces.pdf", "No TVD example trace data")
-        placeholder(filter_dir / "representative_phase_retrieval.pdf", "No TVD example trace data")
+        remove_figure(filter_dir / "representative_phase_retrieval.pdf")
         return
     if "loss_of_lock" in trace.columns:
         no_lock_trace = trace[~bool_series(trace["loss_of_lock"])]
@@ -36,9 +36,7 @@ def plot_cycle_slips() -> None:
     severities = list(SEVERITY_ORDER)
     if not any(str(value) in severities for value in trace["severity"].dropna().unique()):
         placeholder(out_dir / "tvd_example_traces.pdf", "No no-lock TVD example traces")
-        placeholder(
-            filter_dir / "representative_phase_retrieval.pdf", "No no-lock TVD example traces"
-        )
+        remove_figure(filter_dir / "representative_phase_retrieval.pdf")
         return
     fig, axes = plt.subplots(
         3,
@@ -228,5 +226,5 @@ def plot_cycle_slips() -> None:
         error_ax.set_ylabel("Phase differences [cycles]")
         error_ax.legend(loc="best")
     fig.savefig(out_dir / "tvd_example_traces.pdf")
-    fig.savefig(filter_dir / "representative_phase_retrieval.pdf")
+    remove_figure(filter_dir / "representative_phase_retrieval.pdf")
     plt.close(fig)

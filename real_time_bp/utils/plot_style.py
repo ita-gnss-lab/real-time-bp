@@ -34,7 +34,6 @@ FIGSIZES_CM = {
 
 SEVERITY_COLORS = {
     "weak": "#2ca02c",
-    "moderate": "#ff7f0e",
     "strong": "#d62728",
 }
 

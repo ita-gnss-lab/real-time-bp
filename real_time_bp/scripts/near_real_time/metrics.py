@@ -51,20 +51,45 @@ def iter_practical_tasks(
         Tuples consumed by `compute_practical_case_task`.
     """
     experiments = params.get("experiments", {})
-    example_severities: set[str] = set()
+    phase_example_severities: set[str] = set()
+    forecast_example_selected = False
+    near_cfg = params.get("near_real_time", {})
+    forecast_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
     for metadata, case_df in case_iter:
         severity = str(metadata.get("severity"))
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
-        # Paper: Figures 9 and 13 use representative forecast/phase plots by
-        # severity; metrics still use every eligible case.
-        include_examples = case_id in representative_case_ids or (
+        # Paper: Figure 13 uses the same representative cases as the TVD
+        # examples; metrics still use every eligible case.
+        include_phase_example = case_id in representative_case_ids or (
             not representative_case_ids
             and is_representative_case(metadata, experiments)
-            and severity not in example_severities
+            and severity not in phase_example_severities
         )
-        if include_examples:
-            example_severities.add(severity)
-        yield metadata, case_df, params, wavelength_m, tf_estimates, include_examples
+        if include_phase_example:
+            phase_example_severities.add(severity)
+
+        # Paper: Figure 9 shows the VAR forecast on a slightly noisier strong
+        # scintillation case than the 55 dB-Hz phase examples.
+        include_forecast_example = False
+        if not forecast_example_selected and severity == "strong":
+            c_n0 = metadata.get("input_c_n0_db_hz")
+            if forecast_c_n0 is None:
+                include_forecast_example = is_representative_case(metadata, experiments)
+            else:
+                include_forecast_example = bool(
+                    np.isfinite(c_n0) and abs(float(c_n0) - float(forecast_c_n0)) < 1e-6
+                )
+        if include_forecast_example:
+            forecast_example_selected = True
+        yield (
+            metadata,
+            case_df,
+            params,
+            wavelength_m,
+            tf_estimates,
+            include_phase_example,
+            include_forecast_example,
+        )
 
 
 def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
@@ -77,7 +102,15 @@ def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
         Result dictionary from `compute_practical_case`, or None when no
         finite Fresnel-time estimate is available.
     """
-    metadata, case_df, params, wavelength_m, tf_estimates, include_examples = task
+    (
+        metadata,
+        case_df,
+        params,
+        wavelength_m,
+        tf_estimates,
+        include_phase_example,
+        include_forecast_example,
+    ) = task
     case_id = int(metadata.get("tracking_case_id", 0) or 0)
     estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
     if not np.isfinite(estimated_tf):
@@ -88,7 +121,8 @@ def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
         params,
         float(wavelength_m),
         float(estimated_tf),
-        include_examples=bool(include_examples),
+        include_phase_example=bool(include_phase_example),
+        include_forecast_example=bool(include_forecast_example),
     )
 
 
@@ -98,7 +132,8 @@ def compute_practical_case(
     params: dict,
     wavelength_m: float,
     estimated_tf: float,
-    include_examples: bool = False,
+    include_phase_example: bool = False,
+    include_forecast_example: bool = False,
     residual_doppler_error_hz: float = 0.0,
 ) -> dict[str, object]:
     """Compute practical near-real-time metrics for one tracking case.
@@ -109,7 +144,8 @@ def compute_practical_case(
         params: Parsed `params.yaml` dictionary.
         wavelength_m: Carrier wavelength in meters.
         estimated_tf: Estimated Fresnel time scale in seconds.
-        include_examples: Whether to include phase and forecast example rows.
+        include_phase_example: Whether to include phase-example rows.
+        include_forecast_example: Whether to include forecast-example rows.
         residual_doppler_error_hz: Optional residual Doppler sensitivity term.
 
     Returns:
@@ -211,12 +247,12 @@ def compute_practical_case(
             true_phase,
             batch_phase,
         )
-        if include_examples
+        if include_phase_example
         else []
     )
     forecast_rows = (
         forecast_example_rows(metadata, case_df, signal, true_signal, var_result, block_len)
-        if include_examples
+        if include_forecast_example
         else []
     )
     return {

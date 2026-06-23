@@ -12,6 +12,7 @@ stages:
   dataset_summary:
     cmd: uv run python -m real_time_bp.scripts.get_dataset_summary
     deps:
+      - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/scripts/get_dataset_summary.py
       - real_time_bp/utils/stage.py
@@ -30,6 +31,7 @@ stages:
   cycle_slip_results:
     cmd: uv run python -m real_time_bp.scripts.get_cycle_slip_results
     deps:
+      - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/scripts/get_cycle_slip_results.py
       - real_time_bp/utils/stage.py
@@ -56,6 +58,7 @@ stages:
   filter_bank_results:
     cmd: uv run python -m real_time_bp.scripts.get_filter_bank_results
     deps:
+      - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/scripts/get_filter_bank_results.py
       - real_time_bp/utils/stage.py
@@ -86,6 +89,7 @@ stages:
   near_real_time_results:
     cmd: uv run python -m real_time_bp.scripts.get_near_real_time_results
     deps:
+      - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/scripts/get_near_real_time_results.py
       - real_time_bp/scripts/near_real_time/common.py
@@ -124,6 +128,7 @@ stages:
   result_plots:
     cmd: uv run python -m real_time_bp.plots.main
     deps:
+      - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/plots/common.py
       - real_time_bp/plots/cycle_slips.py

@@ -215,14 +215,8 @@ def forecast_example_rows(
 
 def _forecast_example_latencies(future_context: int) -> np.ndarray:
     max_forecast_latency = max(int(future_context) - 1, 0)
-    return np.unique(
-        np.linspace(
-            0,
-            max_forecast_latency,
-            min(4, max_forecast_latency + 1),
-            dtype=int,
-        )
-    )
+    requested = np.asarray([0, 1024, 2048], dtype=int)
+    return np.unique(requested[requested <= max_forecast_latency])
 
 
 def _example_ml_configs(near_cfg: dict) -> list[tuple[int, int]]:

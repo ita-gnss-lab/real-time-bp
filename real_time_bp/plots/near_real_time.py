@@ -9,7 +9,7 @@ from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
 
-from real_time_bp.plots.common import column, placeholder, read_csv, save_figure
+from real_time_bp.plots.common import column, placeholder, read_csv, remove_figure, save_figure
 from real_time_bp.utils.plot_style import (
     COLORS,
     CONFIG_CMAP,
@@ -42,6 +42,7 @@ def plot_near_real_time() -> None:
     _plot_phase_example(phase, out_dir / "near_real_time_phase_example.pdf")
     _plot_forecast_example(forecast, out_dir / "var_forecast_example.pdf")
     _plot_var_residual_diagnostics(diagnostics, out_dir / "var_residual_diagnostics.pdf")
+    remove_figure(out_dir / "var_residual_pacf.pdf")
 
 
 def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
@@ -62,7 +63,7 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
             label=severity,
         )
     ax.set_xlabel("BIC-selected VAR order")
-    ax.set_ylabel("Relative Frequency [%]")
+    ax.set_ylabel("Relative Frequency (%)")
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
     ax.legend()
     save_figure(fig, path)
@@ -240,7 +241,7 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
                 va="top",
                 ha="left",
                 fontsize=FONT_SIZES_PT["annotation"],
-                color="w",
+                color="black",
             )
     if metric_image is not None:
         fig.colorbar(metric_image, ax=axes[0, :], label=r"MRMSE $\phi_r$ [rad]", fraction=0.03)
@@ -276,9 +277,7 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
             ]
         if "latency_samples" in severity_group:
             severity_group = severity_group[
-                pd.to_numeric(severity_group["latency_samples"], errors="coerce").isin(
-                    [0, 256, 512, 1024]
-                )
+                pd.to_numeric(severity_group["latency_samples"], errors="coerce").isin([0, 512])
             ]
         if severity_group.empty:
             ax.text(0.5, 0.5, "No M=2048 examples", ha="center", va="center")
@@ -294,6 +293,15 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         )
         batch_error_col = column(base, "batch_refractive_phase_error_rad", "batch_phase_error_rad")
         batch_error_cycles = base[batch_error_col] / (2.0 * np.pi)
+        if "estimated_scintillation_minus_refractive_rad" in base:
+            ax.plot(
+                base["time_sec"],
+                base["estimated_scintillation_minus_refractive_rad"] / (2.0 * np.pi),
+                color=COLORS["estimated_scintillation"],
+                linestyle="--",
+                linewidth=1.0,
+                label=r"$\hat{\phi}_s-\phi_r$",
+            )
         ax.plot(
             base["time_sec"],
             batch_error_cycles,
@@ -301,31 +309,19 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
             linewidth=1.1,
             label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
         )
-        if "batch_integer_cycle_bias" in base:
-            ax.step(
-                base["time_sec"],
-                base["batch_integer_cycle_bias"],
-                where="mid",
-                color=COLORS["tvd"],
-                linestyle=":",
-                linewidth=1.1,
-                label=r"TVD $\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
-            )
         near_col = column(
             severity_group,
             "near_real_time_refractive_phase_error_rad",
             "near_real_time_phase_error_rad",
         )
-        config_groups = (
-            severity_group.groupby("configuration", sort=False)
-            if "configuration" in severity_group.columns
-            else [(r"M=2048, L=0", severity_group)]
+        config_groups = severity_group.sort_values(["latency_samples", "sample_index"]).groupby(
+            "latency_samples", sort=True
         )
         config_items = list(config_groups)
         config_cmap = plt.get_cmap(CONFIG_CMAP)
         config_colors = config_cmap(np.linspace(0.2, 0.85, len(config_items)))
         finite_times = []
-        for color, (configuration, config_group) in zip(config_colors, config_items):
+        for color, (latency, config_group) in zip(config_colors, config_items):
             phase_error_cycles = config_group[near_col] / (2.0 * np.pi)
             finite = np.isfinite(phase_error_cycles)
             finite_times.extend(config_group.loc[finite, "time_sec"].to_list())
@@ -334,21 +330,11 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 phase_error_cycles,
                 color=color,
                 linewidth=1.0,
-                label=rf"$\hat{{\phi}}_{{r,\mathrm{{sliding}}}}-\phi_r$ ({configuration})",
+                label=rf"$\hat{{\phi}}_{{r,\mathrm{{sliding}}}}-\phi_r$, $L={int(latency)}$",
             )
-            if "near_real_time_integer_cycle_bias" in config_group:
-                ax.step(
-                    config_group["time_sec"],
-                    config_group["near_real_time_integer_cycle_bias"],
-                    where="mid",
-                    color=color,
-                    linestyle=":",
-                    linewidth=1.0,
-                    label=rf"TVD $\hat{{\phi}}_{{r,\mathrm{{sliding}}}}-\phi_r$ ({configuration})",
-                )
         if finite_times:
             ax.set_xlim(min(finite_times), max(finite_times))
-        ax.set_title(str(severity))
+        ax.set_title(str(severity).capitalize())
         ax.set_xlabel("Time [sec]")
         ax.set_ylabel("Phase differences [cycles]")
     axes[-1].legend(loc="best")
@@ -363,9 +349,22 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         return
     strong = df[df["severity"].astype(str).eq("strong")]
     source = strong if not strong.empty else df
-    group = source[source["tracking_case_id"].eq(source["tracking_case_id"].iloc[0])].sort_values(
+    if "input_c_n0_db_hz" in source:
+        ordered_cases = (
+            source[["tracking_case_id", "input_c_n0_db_hz"]]
+            .drop_duplicates("tracking_case_id")
+            .sort_values(["input_c_n0_db_hz", "tracking_case_id"])
+        )
+        case_id = ordered_cases["tracking_case_id"].iloc[0]
+    else:
+        case_id = source["tracking_case_id"].sort_values().iloc[0]
+    group = source[source["tracking_case_id"].eq(case_id)].sort_values(
         ["latency_samples", "sample_index"]
     )
+    group = group[pd.to_numeric(group["latency_samples"], errors="coerce").isin([0, 1024, 2048])]
+    if group.empty:
+        placeholder(path, "Regenerate forecast CSVs for L=0, 1024, 2048")
+        return
     truth = group.drop_duplicates("sample_index").sort_values("sample_index")
     fig, axes = plt.subplots(2, 1, figsize=figure_size("two_row"), sharex=True)
     x_col = "time_sec" if "time_sec" in truth.columns else "sample_index"
@@ -402,13 +401,22 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             alpha=0.75,
             label=r"$\mathrm{Im}\{\hat{\psi}\}$",
         )
-    for latency, latency_group in group.groupby("latency_samples"):
+    forecast_cmap = plt.get_cmap(CONFIG_CMAP)
+    latencies = sorted(pd.to_numeric(group["latency_samples"], errors="coerce").dropna().unique())
+    forecast_colors = {
+        latency: color
+        for latency, color in zip(
+            latencies, forecast_cmap(np.linspace(0.15, 0.85, len(latencies)))
+        )
+    }
+    for latency, latency_group in group.groupby("latency_samples", sort=True):
         latency_x = "time_sec" if "time_sec" in latency_group.columns else "sample_index"
+        forecast_color = forecast_colors.get(float(latency), COLORS["forecast"])
         axes[0].plot(
             latency_group[latency_x],
             latency_group["forecast_real"],
             "--",
-            color=COLORS["forecast"],
+            color=forecast_color,
             linewidth=1.3,
             label=f"Forecast L={int(latency)}",
         )
@@ -416,7 +424,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             latency_group[latency_x],
             latency_group["forecast_imag"],
             "--",
-            color=COLORS["forecast"],
+            color=forecast_color,
             linewidth=1.3,
             label=f"Forecast L={int(latency)}",
         )
@@ -469,7 +477,6 @@ def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
             ax = axes[row, col]
             component_group = severity_group[severity_group["component"].eq(component)]
             residuals = component_group[component_group["diagnostic"].eq("residual")]
-            pacf_values = component_group[component_group["diagnostic"].eq("pacf")]
             ax.plot(
                 residuals["time_sec"],
                 residuals["value"],
@@ -480,14 +487,8 @@ def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
             ax.axhline(0.0, color=COLORS["truth"], linewidth=0.8)
             if residual_ylim is not None:
                 ax.set_ylim(*residual_ylim)
-            inset = ax.inset_axes([0.56, 0.53, 0.4, 0.4])
-            inset.bar(pacf_values["lag"], pacf_values["pacf"], color=color, alpha=0.7, width=0.8)
-            inset.axhline(0.0, color=COLORS["truth"], linewidth=0.6)
-            inset.set_xlim(0, 24)
-            inset.set_title("PACF", fontsize=FONT_SIZES_PT["tick"])
-            inset.tick_params(labelsize=FONT_SIZES_PT["annotation"])
             if row == 0:
-                ax.set_title(severity)
+                ax.set_title(str(severity).capitalize())
             if col == 0:
                 ax.set_ylabel(
                     r"$\mathrm{Re}\{\hat{\psi}\}$ residuals"

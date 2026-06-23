@@ -13,32 +13,18 @@ from real_time_bp.config import PROJECT_ROOT
 
 TRACKING_BASE_REQUIRED_COLUMNS = {
     "tracking_case_id",
-    "example_idx",
-    "c_n0_idx",
     "epoch_idx",
     "time_sec",
-    "svid",
-    "frequency",
-    "input_c_n0_db_hz",
-    "init_doppler_error_hz",
-    "severity",
 }
 TRACKING_READ_DTYPES = {
     "tracking_case_id": "int64",
-    "example_idx": "int32",
-    "c_n0_idx": "int32",
     "epoch_idx": "int32",
     "time_sec": "float64",
-    "input_c_n0_db_hz": "float64",
-    "init_doppler_error_hz": "float64",
-    "carrier_phase_est_m": "float64",
-    "los_phase_m": "float64",
+    "estimated_scintillation_phase_m": "float64",
     "scint_phase_m": "float64",
     "true_refractive_phase_m": "float64",
     "tracked_intensity": "float64",
-    "estimated_c_n0_db_hz": "float64",
     "true_intensity": "float64",
-    "rhof_veff_ratio": "float64",
 }
 
 
@@ -229,7 +215,12 @@ def iter_case_dataframes(
                 case_id = metadata["tracking_case_id"]
                 if case_id in diagnostics_by_case.index:
                     metadata = {**metadata, **diagnostics_by_case.loc[case_id].to_dict()}
-            severity = str(metadata.get("severity", case_df["severity"].iloc[0]))
+            if "severity" in metadata:
+                severity = str(metadata["severity"])
+            elif "severity" in case_df.columns:
+                severity = str(case_df["severity"].iloc[0])
+            else:
+                severity = ""
             if severity_filter and severity not in severity_filter:
                 continue
             c_n0 = metadata.get("input_c_n0_db_hz", np.nan)
@@ -284,16 +275,16 @@ def _normalize_tracking_chunk(chunk: pd.DataFrame) -> pd.DataFrame:
 
 def _metadata_from_case(case_df: pd.DataFrame) -> dict:
     first = case_df.iloc[0]
-    metadata = {
-        "tracking_case_id": int(first["tracking_case_id"]),
-        "example_idx": int(first["example_idx"]),
-        "c_n0_idx": int(first["c_n0_idx"]),
-        "svid": str(first["svid"]),
-        "frequency": str(first["frequency"]),
-        "severity": str(first["severity"]),
-        "input_c_n0_db_hz": float(first["input_c_n0_db_hz"]),
-        "init_doppler_error_hz": float(first["init_doppler_error_hz"]),
-    }
+    metadata = {"tracking_case_id": int(first["tracking_case_id"])}
+    for column in ["example_idx", "c_n0_idx"]:
+        if column in case_df.columns:
+            metadata[column] = int(first[column])
+    for column in ["svid", "frequency", "severity"]:
+        if column in case_df.columns:
+            metadata[column] = str(first[column])
+    for column in ["input_c_n0_db_hz", "init_doppler_error_hz"]:
+        if column in case_df.columns:
+            metadata[column] = float(first[column])
     for column in ["rhof_veff_ratio"]:
         if column in case_df.columns:
             metadata[column] = float(first[column])

@@ -42,12 +42,12 @@ def estimated_scintillation_phase_rad(
         Estimated scintillation phase in radians.
     """
     # Paper: Methodology Eq. (12).
-    # The carrier-loop phase estimate is cleaned by subtracting the LOS phase.
+    # The compact dataset stores this LOS-corrected phase directly, so this
+    # repo no longer reconstructs it from removed per-sample tracking columns.
     # The `residual_doppler_error_hz` is an explicit sensitivity term used in
     # Section III.3.3.
-    carrier_phase_m = case_df["carrier_phase_est_m"].to_numpy(dtype=float)
-    los_phase_m = case_df["los_phase_m"].to_numpy(dtype=float)
-    phase_rad = meters_to_radians(carrier_phase_m - los_phase_m, wavelength_m)
+    phase_m = case_df["estimated_scintillation_phase_m"].to_numpy(dtype=float)
+    phase_rad = meters_to_radians(phase_m, wavelength_m)
     time_sec = case_df["time_sec"].to_numpy(dtype=float)
     time_rel = time_sec - time_sec[0]
     return phase_rad - 2.0 * np.pi * float(residual_doppler_error_hz) * time_rel

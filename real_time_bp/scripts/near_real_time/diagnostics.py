@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.stattools import pacf
 
 from real_time_bp.methodology.near_real_time import select_var_order_bic
 from real_time_bp.methodology.signal_model import estimated_scintillation_signal
@@ -75,7 +74,8 @@ def compute_residual_doppler_metrics(
                 params,
                 float(wavelength_m),
                 float(estimated_tf),
-                include_examples=False,
+                include_phase_example=False,
+                include_forecast_example=False,
                 residual_doppler_error_hz=float(residual_row.residual_doppler_error_hz),
             )
             rows.append(result["practical_row"])
@@ -88,7 +88,7 @@ def compute_var_residual_diagnostics(
     wavelength_m: float,
     representative_case_ids: set[int],
 ) -> pd.DataFrame:
-    """Compute standardized VAR residuals and PACF diagnostics.
+    """Compute standardized VAR residual diagnostics.
 
     Args:
         params: Parsed `params.yaml` dictionary.
@@ -98,8 +98,8 @@ def compute_var_residual_diagnostics(
             diagnostic plots.
 
     Returns:
-        DataFrame containing residual samples and PACF values for real and
-        imaginary VAR components.
+        DataFrame containing residual samples for real and imaginary VAR
+        components.
     """
     selected_case_ids = representative_case_ids or (
         select_heatmap_case_ids(params, paths) or set()
@@ -144,23 +144,6 @@ def compute_var_residual_diagnostics(
                         "sample_index": int(sample_index),
                         "time_sec": float(case_df["time_sec"].iloc[sample_index]),
                         "value": float(value),
-                        "lag": np.nan,
-                        "pacf": np.nan,
-                    }
-                )
-            max_lag = min(24, max(1, values.size // 4))
-            pacf_values = pacf(standardized, nlags=max_lag, method="ywm")
-            for lag, value in enumerate(pacf_values):
-                rows.append(
-                    {
-                        **case_keys(metadata),
-                        "component": component,
-                        "diagnostic": "pacf",
-                        "sample_index": np.nan,
-                        "time_sec": np.nan,
-                        "value": np.nan,
-                        "lag": int(lag),
-                        "pacf": float(value),
                     }
                 )
     return pd.DataFrame(rows)

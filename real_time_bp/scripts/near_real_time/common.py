@@ -9,8 +9,7 @@ from real_time_bp.config import CSV_RESULTS_DIR
 from real_time_bp.methodology.filter_bank import AMPLITUDE_SCORE_NAME
 
 NEAR_REAL_TIME_TRACKING_COLUMNS = {
-    "carrier_phase_est_m",
-    "los_phase_m",
+    "estimated_scintillation_phase_m",
     "scint_phase_m",
     "time_sec",
     "tracked_intensity",
