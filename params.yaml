@@ -12,7 +12,6 @@ runtime:
 constants:
   speed_of_light_m_s: 299792458.0
   gps_l1_hz: 1575420000.0
-  # TODO: Include a seed here to control the experiments randomness, if we use randomness somewhere.
 
 experiments:
   # Paper: Results Section III.1; the dataset is stratified
@@ -37,19 +36,12 @@ experiments:
   tf_candidate_min_s: 0.5
   tf_candidate_max_s: 2.0
   tf_candidate_count: 72
-  #FIXME: Only 4096 is passing through
+  # Representative score-curve sweeps for Figure 2.
   score_curve_n_init_samples:
     - 512
     - 1024
     - 4096
-  #TODO: Remove this score_curve_residual_doppler_errors_hz parameter.
-  score_curve_residual_doppler_errors_hz:
-    - 0.0
-  #TODO: Remove the residual Doppler error analysis from the score curves. Leave it only to the near real-time stage.
-  residual_doppler_error_hz_min: 0.0
-  residual_doppler_error_hz_max: 250.0
-  residual_doppler_error_count: 26
-  #TODO: This representative C/N0 seems misplaced. Please check if it is used anywhere in the code. If not, remove it.
+  # C/N0 used to choose representative examples for figures.
   representative_c_n0_db_hz: 35.0
 
 tvd:
@@ -91,7 +83,6 @@ near_real_time:
     - 1.0
   # Paper: Figure 11 is an aggregate diagnostic; this many evenly spaced
   # time samples are evaluated per M/L cell to keep the DVC stage tractable.
-  #TODO: If it control how many examples it is used, remove it. I want to use as many examples as possible.
   heatmap_eval_samples: 750
   # Paper: Results Section III.3, Figure 12; practical operating
   # point used for the batch vs near-real-time comparison.
@@ -102,8 +93,6 @@ near_real_time:
   residual_doppler_error_count: 16
   heatmap_max_cases_per_severity: 1
   forecast_example_c_n0_db_hz: 35.0
-  # TODO: Check if example_context_samples is really needed later. If it control how many examples it is used, remove it. I want to use as many examples as possible.
-  example_context_samples: 750
   example_ml_configs:
     - block_len: 2048
       latency_samples: 0

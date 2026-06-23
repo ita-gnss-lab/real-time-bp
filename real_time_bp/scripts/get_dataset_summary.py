@@ -10,14 +10,13 @@ from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging
 from real_time_bp.utils.stage import (
     csv_stage_dir,
-    residual_doppler_grid_hz,
     tf_candidate_grid,
     write_csv,
 )
 
 
 def main() -> None:
-    """Write dataset metadata, residual Doppler, and T_F candidate CSVs.
+    """Write dataset metadata and T_F candidate CSVs.
 
     Main paper:
         Results Section III.1 uses these summaries as source tables for
@@ -65,8 +64,10 @@ def main() -> None:
     write_csv(dataset_paths, out_dir / "dataset_paths.csv")
     write_csv(case_index, out_dir / "case_index.csv")
     write_csv(summary, out_dir / "dataset_summary.csv")
-    write_csv(residual_doppler_grid_hz(params), out_dir / "residual_doppler_grid.csv")
     write_csv(tf_candidates, out_dir / "fresnel_time_candidate_grid.csv")
+    stale_residual_grid = out_dir / "residual_doppler_grid.csv"
+    if stale_residual_grid.exists():
+        stale_residual_grid.unlink()
     logger.info("Finished dataset summary stage")
 
 

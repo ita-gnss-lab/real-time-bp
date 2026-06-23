@@ -69,15 +69,31 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
     axes = np.atleast_1d(axes)
     for ax, severity in zip(axes, severities):
         group = scores[scores["severity"].eq(severity)]
-        case_id = group["tracking_case_id"].iloc[0]
+        if "residual_doppler_error_hz" in group.columns:
+            residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
+            group = group[residual.fillna(0.0).eq(0.0)]
+        if group.empty:
+            ax.text(0.5, 0.5, "No zero-Doppler score data", ha="center", va="center")
+            ax.set_axis_off()
+            continue
+        n_init_per_case = (
+            group.assign(
+                _n_init=pd.to_numeric(group["n_init_samples"], errors="coerce"),
+            )
+            .dropna(subset=["_n_init"])
+            .groupby("tracking_case_id")["_n_init"]
+            .nunique()
+            .sort_values(ascending=False)
+        )
+        if n_init_per_case.empty:
+            ax.text(0.5, 0.5, "No N_init score data", ha="center", va="center")
+            ax.set_axis_off()
+            continue
+        case_id = n_init_per_case.index[0]
         group = group[group["tracking_case_id"].eq(case_id)]
         n_init_values = sorted(
             pd.to_numeric(group["n_init_samples"], errors="coerce").dropna().unique()
         )
-        # FIXME: Remove residual_doppler analysis on the score curves, as it is not part of the main paper anymore.
-        if "residual_doppler_error_hz" in group.columns:
-            residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
-            group = group[residual.fillna(0.0).eq(0.0)]
         n_init_cmap = plt.get_cmap(CONFIG_CMAP)
         n_init_colors = n_init_cmap(np.linspace(0.18, 0.86, max(len(n_init_values), 1)))
         for style_idx, n_init in enumerate(n_init_values):

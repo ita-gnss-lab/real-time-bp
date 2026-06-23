@@ -313,11 +313,18 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         )
         batch_error_col = column(base, "batch_refractive_phase_error_rad", "batch_phase_error_rad")
         batch_error_cycles = base[batch_error_col] / (2.0 * np.pi)
-        # FIXME: There is still a phase bias between phi_s - phi_r and the zero-line. fix this. 
         if "estimated_scintillation_minus_refractive_rad" in base:
+            diffractive_cycles = base["estimated_scintillation_minus_refractive_rad"] / (
+                2.0 * np.pi
+            )
+            finite_diffractive = np.isfinite(diffractive_cycles)
+            if finite_diffractive.any():
+                diffractive_cycles = diffractive_cycles - float(
+                    np.nanmedian(diffractive_cycles[finite_diffractive])
+                )
             ax.plot(
                 base["time_sec"],
-                base["estimated_scintillation_minus_refractive_rad"] / (2.0 * np.pi),
+                diffractive_cycles,
                 color=COLORS["estimated_scintillation"],
                 linestyle="--",
                 linewidth=1.0,

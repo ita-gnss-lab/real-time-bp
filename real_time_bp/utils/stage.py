@@ -88,44 +88,6 @@ def l1_wavelength_from_params(params: dict[str, Any]) -> float:
     )
 
 
-def residual_doppler_grid_hz(params: dict[str, Any]) -> pd.DataFrame:
-    """Build the residual Doppler sensitivity grid.
-
-    Main paper:
-        Results Section III.1 specifies residual Doppler sensitivity in terms
-        of geometric-rate error Delta G and converts it to
-        Delta f_D = Delta G / lambda for L1.
-
-    Args:
-        params: Parsed `params.yaml` dictionary.
-
-    Returns:
-        DataFrame with residual geometric error and Doppler error columns.
-    """
-    experiments = params.get("experiments", {})
-    wavelength = l1_wavelength_from_params(params)
-    if "residual_doppler_error_hz_max" in experiments:
-        residual_doppler_error_hz = np.linspace(
-            float(experiments.get("residual_doppler_error_hz_min", 0.0)),
-            float(experiments.get("residual_doppler_error_hz_max", 20.0)),
-            int(experiments.get("residual_doppler_error_count", 21)),
-        )
-        geometric_error_mps = residual_doppler_error_hz * wavelength
-    else:
-        geometric_error_mps = np.linspace(
-            float(experiments.get("residual_geometric_error_mps_min", 0.0)),
-            float(experiments.get("residual_geometric_error_mps_max", 0.1)),
-            int(experiments.get("residual_geometric_error_count", 15)),
-        )
-        residual_doppler_error_hz = geometric_error_mps / wavelength
-    return pd.DataFrame(
-        {
-            "residual_geometric_error_mps": geometric_error_mps,
-            "residual_doppler_error_hz": residual_doppler_error_hz,
-        }
-    )
-
-
 def tf_candidate_grid(params: dict[str, Any]) -> np.ndarray:
     """Build the Fresnel-time candidate grid from experiment parameters.
 

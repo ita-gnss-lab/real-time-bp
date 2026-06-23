@@ -92,7 +92,6 @@ def main() -> None:
     wavelength_m = l1_wavelength_from_params(params)
     candidates = tf_candidate_grid(params)
     score_n_init_samples = _score_curve_n_init_samples(experiments)
-    score_residual_doppler_errors_hz = _score_curve_residual_doppler_errors_hz(experiments)
     representative_case_ids = set(load_representative_case_ids().values())
     max_cases = optional_int(experiments.get("max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
@@ -124,7 +123,6 @@ def main() -> None:
         residual_doppler_error_hz=0.0,
         n_init=int(experiments.get("n_init_samples", 4096)),
         score_n_init_samples=score_n_init_samples,
-        score_residual_doppler_errors_hz=score_residual_doppler_errors_hz,
         include_representative_traces=True,
         experiments=experiments,
         representative_case_ids=representative_case_ids,
@@ -180,7 +178,6 @@ def _compute_case_filter_bank(
     residual_doppler_error_hz: float,
     n_init: int,
     score_n_init_samples: list[int] | None = None,
-    score_residual_doppler_errors_hz: list[float] | None = None,
     include_trace: bool = False,
 ) -> dict[str, list[dict]]:
     """Compute filter-bank score, T_F estimate, metrics, and trace rows.
@@ -223,24 +220,15 @@ def _compute_case_filter_bank(
     score_curve_by_spec = {(int(n_init), float(residual_doppler_error_hz)): primary_score_curve}
     if include_trace:
         for score_n_init in score_n_init_samples or [n_init]:
-            for score_residual_doppler in score_residual_doppler_errors_hz or [
-                residual_doppler_error_hz
-            ]:
-                score_n_init = min(int(score_n_init), len(case_df))
-                score_residual_doppler = float(score_residual_doppler)
-                spec = (score_n_init, score_residual_doppler)
-                if spec in score_curve_by_spec:
-                    continue
-                score_signal = estimated_scintillation_signal(
-                    case_df,
-                    wavelength_m,
-                    score_residual_doppler,
-                )
-                score_curve_by_spec[spec] = compute_filter_bank_score(
-                    score_signal[:score_n_init],
-                    sample_interval_s,
-                    candidates,
-                )
+            score_n_init = min(int(score_n_init), len(case_df))
+            spec = (score_n_init, float(residual_doppler_error_hz))
+            if spec in score_curve_by_spec:
+                continue
+            score_curve_by_spec[spec] = compute_filter_bank_score(
+                signal[:score_n_init],
+                sample_interval_s,
+                candidates,
+            )
     for (score_n_init, score_residual_doppler), score_curve in sorted(score_curve_by_spec.items()):
         estimated_score_tf = select_fresnel_time_estimate(candidates, score_curve)
         for i, candidate in enumerate(candidates):
@@ -354,7 +342,6 @@ def _iter_filter_bank_tasks(
     residual_doppler_error_hz: float,
     n_init: int,
     score_n_init_samples: list[int] | None = None,
-    score_residual_doppler_errors_hz: list[float] | None = None,
     include_representative_traces: bool = False,
     experiments: dict | None = None,
     representative_case_ids: set[int] | None = None,
@@ -391,7 +378,6 @@ def _iter_filter_bank_tasks(
             residual_doppler_error_hz,
             n_init,
             score_n_init_samples,
-            score_residual_doppler_errors_hz,
             include_trace,
         )
 
@@ -406,7 +392,6 @@ def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]]:
         residual_doppler_error_hz,
         n_init,
         score_n_init_samples,
-        score_residual_doppler_errors_hz,
         include_trace,
     ) = task
     return _compute_case_filter_bank(
@@ -418,7 +403,6 @@ def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]]:
         residual_doppler_error_hz=float(residual_doppler_error_hz),
         n_init=int(n_init),
         score_n_init_samples=score_n_init_samples,
-        score_residual_doppler_errors_hz=score_residual_doppler_errors_hz,
         include_trace=bool(include_trace),
     )
 
@@ -459,7 +443,6 @@ def _compute_n_init_sensitivity(
             residual_doppler_error_hz=0.0,
             n_init=int(n_init),
             score_n_init_samples=None,
-            score_residual_doppler_errors_hz=None,
         )
         result_iter = ordered_parallel_map(
             _compute_case_filter_bank_task,
@@ -509,13 +492,6 @@ def _score_curve_n_init_samples(experiments: dict) -> list[int]:
     if values:
         return sorted({int(value) for value in values})
     return [512, 1024, int(experiments.get("n_init_samples", 4096))]
-
-
-def _score_curve_residual_doppler_errors_hz(experiments: dict) -> list[float]:
-    values = experiments.get("score_curve_residual_doppler_errors_hz")
-    if values:
-        return sorted({float(value) for value in values})
-    return [0.0]
 
 
 def _aggregate_tf_error_metrics(estimates: pd.DataFrame) -> pd.DataFrame:
