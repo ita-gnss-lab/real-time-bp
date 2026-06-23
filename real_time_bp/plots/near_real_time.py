@@ -71,7 +71,7 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
             label=severity,
         )
     ax.set_xlabel("BIC-selected VAR order")
-    ax.set_ylabel("Relative Frequency (%)")
+    ax.set_ylabel("Relative Frequency")
     ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
     ax.legend()
     save_figure(fig, path)
@@ -161,7 +161,7 @@ def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: P
     axes[1].set_xlabel(r"Residual Doppler error [Hz]")
     axes[1].set_xlim(0.0, 1.5)
     for ax in axes:
-        ax.set_ylabel(r"MRMSE $\phi_r$ [rad]")
+        ax.set_ylabel(r"MRMSE $\hat{\phi}_r$ [rad]")
         if n_value is not None and m_value is not None:
             ax.set_title(rf"$N_{{\mathrm{{init}}}}={n_value}$, $M={m_value}$")
     axes[0].legend()
@@ -213,7 +213,7 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
         )
         for row, (pivot, vmin, vmax, title) in enumerate(
             [
-                (metric_pivot, metric_vmin, metric_vmax, r"MRMSE $\phi_r$ [rad]"),
+                (metric_pivot, metric_vmin, metric_vmax, r"MRMSE $\hat{\phi}_r$ [rad]"),
                 (cs_pivot, cs_vmin, cs_vmax, "CS/min"),
             ]
         ):
@@ -260,7 +260,7 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
                 color="black",
             )
     if metric_image is not None:
-        fig.colorbar(metric_image, ax=axes[0, :], label=r"MRMSE $\phi_r$ [rad]", fraction=0.03)
+        fig.colorbar(metric_image, ax=axes[0, :], label=r"MRMSE $\hat{\phi}_r$ [rad]", fraction=0.03)
     if cs_image is not None:
         fig.colorbar(cs_image, ax=axes[1, :], label="CS/min", fraction=0.03)
     save_figure(fig, path, tight=False)
@@ -273,6 +273,8 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         Results Figure 13 compares truth, batch BP, and near-real-time BP for
         representative cases.
     """
+    # TODO: Put the legend as a third dedicated column.
+    # TODO: Put the value o N_init and M in the title of the legend.
     if df.empty:
         placeholder(path, "No phase example data")
         return
@@ -376,6 +378,8 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         Results Figure 9 compares true and VAR-forecasted real/imaginary
         scintillation samples for a representative case.
     """
+    # FIXME: The forecast picture is not being plotted anymore.
+    # TODO: Thehe VAR forecast example should be refactored as a 1x2 plot of a zoom between 70 to 80 seconds of a single forecast. Lets include later the start and begining of the zoom in the params.yaml file.
     if df.empty:
         placeholder(path, "No forecast example data")
         return
@@ -476,7 +480,11 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
     save_figure(fig, path)
 
 
-def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None:
+def _plot_var_residual_diagnostics(df: pd.DataFrame, path: Path) -> None: 
+    # TODO: include in the legend titles the percentage of runs that passed the tests below with a 95% confidence interval:
+    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults
+    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults
+    # TODO: Include also the amount of N_init used for fitting the VAR model.
     if df.empty:
         placeholder(path, "No VAR residual diagnostic data")
         return

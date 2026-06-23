@@ -20,6 +20,8 @@ def plot_cycle_slips() -> None:
         Results Figure 1 diagnostic support visualizes the TVD integer
         cycle-bias trace beside the fade minima that constrain allowed jumps.
     """
+    #TODO: Put all the Legends in a third column of the plot, so that it is easier to read the plots. There is still a offset on the phase difference plots. 
+    #TODO: Include a parameter in the params.yaml that enables me to choose the index of the weak and strong scintillation examples to be processed.
     out_dir = figure_stage_dir("02_cycle_slips")
     filter_dir = figure_stage_dir("03_filter_bank")
     params = load_params()

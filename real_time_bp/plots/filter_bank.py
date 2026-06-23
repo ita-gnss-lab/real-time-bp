@@ -56,6 +56,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         Results Figure 2 displays J(T_F) against N_init for representative
         cases. Residual Doppler robustness is not part of this figure.
     """
+    # TODO: Include the legends in a dedicated third column.
     if scores.empty:
         placeholder(path, "No filter-bank score data")
         return

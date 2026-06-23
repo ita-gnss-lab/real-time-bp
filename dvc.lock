@@ -35,8 +35,8 @@ stages:
       size: 1709
     - path: real_time_bp/scripts/get_dataset_summary.py
       hash: md5
-      md5: b615778c93f3feb6fea958c45e881038
-      size: 2658
+      md5: 762b70a6997447f808f995fbbb04dc04
+      size: 2660
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 321d912380ca19e43714fef8fbfe3fdb
@@ -51,8 +51,8 @@ stages:
       size: 1226
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 0d45dce7b2d5d7bf1ff670b0c1ddfedb
-      size: 10956
+      md5: 36c15023e590100d712d755b47f415f2
+      size: 9433
     params:
       params.yaml:
         constants:
@@ -81,18 +81,13 @@ stages:
           - 512
           - 1024
           - 4096
-          score_curve_residual_doppler_errors_hz:
-          - 0.0
-          residual_doppler_error_hz_min: 0.0
-          residual_doppler_error_hz_max: 250.0
-          residual_doppler_error_count: 26
           representative_c_n0_db_hz: 35.0
     outs:
     - path: results/csv/01_dataset
       hash: md5
-      md5: b81382316bafaf7bf60b79891c37bcbe.dir
-      size: 193194
-      nfiles: 5
+      md5: 2eb25f5633d54595e29a072f5436c35f.dir
+      size: 192530
+      nfiles: 4
   cycle_slip_results:
     cmd: uv run python -m real_time_bp.scripts.get_cycle_slip_results
     deps:
@@ -151,13 +146,13 @@ stages:
       size: 3421
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 0d45dce7b2d5d7bf1ff670b0c1ddfedb
-      size: 10956
+      md5: 36c15023e590100d712d755b47f415f2
+      size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: b81382316bafaf7bf60b79891c37bcbe.dir
-      size: 193194
-      nfiles: 5
+      md5: 2eb25f5633d54595e29a072f5436c35f.dir
+      size: 192530
+      nfiles: 4
     params:
       params.yaml:
         constants:
@@ -186,11 +181,6 @@ stages:
           - 512
           - 1024
           - 4096
-          score_curve_residual_doppler_errors_hz:
-          - 0.0
-          residual_doppler_error_hz_min: 0.0
-          residual_doppler_error_hz_max: 250.0
-          residual_doppler_error_count: 26
           representative_c_n0_db_hz: 35.0
         runtime:
           csv_chunksize: 75000
@@ -248,8 +238,8 @@ stages:
       size: 9215
     - path: real_time_bp/scripts/get_filter_bank_results.py
       hash: md5
-      md5: 519f11267e037b7a0092aeb78ea31dfa
-      size: 21111
+      md5: aec46718380a5a416081fe1b37be1f20
+      size: 19930
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 321d912380ca19e43714fef8fbfe3fdb
@@ -276,13 +266,13 @@ stages:
       size: 3421
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 0d45dce7b2d5d7bf1ff670b0c1ddfedb
-      size: 10956
+      md5: 36c15023e590100d712d755b47f415f2
+      size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: b81382316bafaf7bf60b79891c37bcbe.dir
-      size: 193194
-      nfiles: 5
+      md5: 2eb25f5633d54595e29a072f5436c35f.dir
+      size: 192530
+      nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
       md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
@@ -316,11 +306,6 @@ stages:
           - 512
           - 1024
           - 4096
-          score_curve_residual_doppler_errors_hz:
-          - 0.0
-          residual_doppler_error_hz_min: 0.0
-          residual_doppler_error_hz_max: 250.0
-          residual_doppler_error_count: 26
           representative_c_n0_db_hz: 35.0
         runtime:
           csv_chunksize: 75000
@@ -430,13 +415,13 @@ stages:
       size: 3421
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 0d45dce7b2d5d7bf1ff670b0c1ddfedb
-      size: 10956
+      md5: 36c15023e590100d712d755b47f415f2
+      size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: b81382316bafaf7bf60b79891c37bcbe.dir
-      size: 193194
-      nfiles: 5
+      md5: 2eb25f5633d54595e29a072f5436c35f.dir
+      size: 192530
+      nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
       md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
@@ -475,11 +460,6 @@ stages:
           - 512
           - 1024
           - 4096
-          score_curve_residual_doppler_errors_hz:
-          - 0.0
-          residual_doppler_error_hz_min: 0.0
-          residual_doppler_error_hz_max: 250.0
-          residual_doppler_error_count: 26
           representative_c_n0_db_hz: 35.0
         near_real_time:
           var_order_min: 1
@@ -511,7 +491,6 @@ stages:
           residual_doppler_error_count: 16
           heatmap_max_cases_per_severity: 1
           forecast_example_c_n0_db_hz: 35.0
-          example_context_samples: 750
           example_ml_configs:
           - block_len: 2048
             latency_samples: 0
@@ -556,16 +535,16 @@ stages:
       size: 8930
     - path: real_time_bp/plots/filter_bank.py
       hash: md5
-      md5: ddb56d7d765372ee498b4b760c28a0b0
-      size: 9590
+      md5: 8539213912491d2e8db6e89b0444b7ed
+      size: 10107
     - path: real_time_bp/plots/main.py
       hash: md5
       md5: 212cf6056ef706ba62a3a5fe3f609852
       size: 839
     - path: real_time_bp/plots/near_real_time.py
       hash: md5
-      md5: a92503a43194ad71cbb997f60eec2e62
-      size: 20782
+      md5: a5874b67bef30bca74a844e532252522
+      size: 21029
     - path: real_time_bp/utils/params.py
       hash: md5
       md5: d0db521576c3bbd5183e942b807a3fdd
@@ -584,13 +563,13 @@ stages:
       size: 3421
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 0d45dce7b2d5d7bf1ff670b0c1ddfedb
-      size: 10956
+      md5: 36c15023e590100d712d755b47f415f2
+      size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: b81382316bafaf7bf60b79891c37bcbe.dir
-      size: 193194
-      nfiles: 5
+      md5: 2eb25f5633d54595e29a072f5436c35f.dir
+      size: 192530
+      nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
       md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
@@ -627,11 +606,6 @@ stages:
           - 512
           - 1024
           - 4096
-          score_curve_residual_doppler_errors_hz:
-          - 0.0
-          residual_doppler_error_hz_min: 0.0
-          residual_doppler_error_hz_max: 250.0
-          residual_doppler_error_count: 26
           representative_c_n0_db_hz: 35.0
         near_real_time:
           var_order_min: 1
@@ -663,7 +637,6 @@ stages:
           residual_doppler_error_count: 16
           heatmap_max_cases_per_severity: 1
           forecast_example_c_n0_db_hz: 35.0
-          example_context_samples: 750
           example_ml_configs:
           - block_len: 2048
             latency_samples: 0
@@ -679,6 +652,6 @@ stages:
     outs:
     - path: results/figures
       hash: md5
-      md5: 67ddc4c9aadbe1e7c3a6ef2e1de6edfe.dir
-      size: 2386685
+      md5: d22ed71a288be69ae970ff8a2efecfc6.dir
+      size: 2388873
       nfiles: 9

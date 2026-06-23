@@ -28,7 +28,7 @@ FIGSIZES_CM = {
     "two_panel": (SCALED_WIDTH_CM * 1.65, SCALED_HEIGHT_CM * 1.15),
     "two_row": (SCALED_WIDTH_CM * 1.65, SCALED_HEIGHT_CM * 1.8),
     "boxplot_grid": (SCALED_WIDTH_CM * 2.0, SCALED_HEIGHT_CM * 1.45),
-    "heatmap_grid": (SCALED_WIDTH_CM * 2.35, SCALED_HEIGHT_CM * 2.45),
+    "heatmap_grid": (SCALED_WIDTH_CM * 2, SCALED_HEIGHT_CM * 1.9),
     "placeholder": (SCALED_WIDTH_CM, SCALED_HEIGHT_CM * 0.85),
 }
 
@@ -85,8 +85,8 @@ def grid_figure_size(
     columns: int,
     rows: int,
     *,
-    panel_width_cm: float = 8.8,
-    panel_height_cm: float = 4.8,
+    panel_width_cm: float = 10,
+    panel_height_cm: float = 3.5,
 ) -> tuple[float, float]:
     """Compute a grid figure size from panel dimensions.
 

@@ -28,6 +28,9 @@ def select_var_order_bic(
     Returns:
         Selected order and the fitted statsmodels VAR result.
     """
+    # TODO: Run the tests below with a 95% of confidence interval and include a flag that should be used to assess how many runs passed each test later. Use default sensible values to setup the test, and include them in the params.yaml file.
+    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.NormalityTestResults
+    # test: https://www.statsmodels.org/stable/generated/statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults.html#statsmodels.tsa.vector_ar.hypothesis_test_results.WhitenessTestResults
     best_order = int(min_order)
     best_result = None
     best_bic = float("inf")
