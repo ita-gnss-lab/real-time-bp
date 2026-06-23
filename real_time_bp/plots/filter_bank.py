@@ -74,6 +74,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         n_init_values = sorted(
             pd.to_numeric(group["n_init_samples"], errors="coerce").dropna().unique()
         )
+        # FIXME: Remove residual_doppler analysis on the score curves, as it is not part of the main paper anymore.
         if "residual_doppler_error_hz" in group.columns:
             residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
             group = group[residual.fillna(0.0).eq(0.0)]
@@ -120,7 +121,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
                     linewidth=1,
                     label=r"$T_{\mathrm{F}}$",
                 )
-        ax.set_title(str(severity))
+        ax.set_title(str(severity).capitalize())
         ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
     axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
     axes[-1].legend()

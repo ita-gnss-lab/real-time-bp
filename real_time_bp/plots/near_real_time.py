@@ -163,7 +163,7 @@ def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: P
     for ax in axes:
         ax.set_ylabel(r"MRMSE $\phi_r$ [rad]")
         if n_value is not None and m_value is not None:
-            ax.set_title(rf"$N={n_value}$, $M={m_value}$")
+            ax.set_title(rf"$N_{{\mathrm{{init}}}}={n_value}$, $M={m_value}$")
     axes[0].legend()
     axes[1].legend()
     save_figure(fig, path)
@@ -228,7 +228,7 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
             )
             if row == 0:
                 metric_image = image
-                ax.set_title(str(severity))
+                ax.set_title(str(severity).capitalize())
             else:
                 cs_image = image
             ax.set_yticks(np.arange(len(pivot.index)))
@@ -313,6 +313,7 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         )
         batch_error_col = column(base, "batch_refractive_phase_error_rad", "batch_phase_error_rad")
         batch_error_cycles = base[batch_error_col] / (2.0 * np.pi)
+        # FIXME: There is still a phase bias between phi_s - phi_r and the zero-line. fix this. 
         if "estimated_scintillation_minus_refractive_rad" in base:
             ax.plot(
                 base["time_sec"],
