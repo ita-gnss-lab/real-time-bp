@@ -161,7 +161,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
     axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
     handles, labels = _unique_legend_items(axes[:-1])
     if handles:
-        legend_ax.legend(handles, labels, loc="center left", frameon=False)
+        legend_ax.legend(handles, labels, loc="center left")
     save_figure(fig, path)
 
 
@@ -240,7 +240,6 @@ def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax, n_init_samples: int) -> 
     ax.set_xticklabels([f"{value:.2f}" for value in centers], rotation=45)
     ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
     ax.set_ylabel(r"$\hat{T}_{\mathrm{F}}$ [s]")
-    ax.set_title(rf"$N_{{\mathrm{{init}}}}={int(n_init_samples)}$")
     ax.legend(
         handles=[
             *legend_handles,

@@ -155,7 +155,13 @@ def _optional_float(value: float) -> float:
 
 
 def forecast_example_rows(
-    metadata, case_df, signal, true_signal, var_result, block_len
+    metadata,
+    case_df,
+    signal,
+    true_signal,
+    var_result,
+    block_len: int,
+    latencies: list[int],
 ) -> list[dict]:
     """Build rows for the VAR forecast example figure.
 
@@ -172,6 +178,7 @@ def forecast_example_rows(
         true_signal: Complex noiseless truth scintillation signal.
         var_result: Fitted VAR result used to forecast future samples.
         block_len: Sliding FFT block length that defines the future context.
+        latencies: Latency values included in the forecast comparison.
 
     Returns:
         List of CSV rows comparing true, tracked, and forecasted real/imaginary
@@ -185,9 +192,10 @@ def forecast_example_rows(
         return []
     features = np.column_stack([np.real(signal), np.imag(signal)])
     rows = []
-    for latency in _forecast_example_latencies(future_context):
+    for latency in _forecast_example_latencies(future_context, latencies):
         observed_stop = center + int(latency)
-        forecast_steps = future_context - int(latency)
+        available_future_samples = len(case_df) - observed_stop - 1
+        forecast_steps = min(future_context - int(latency), available_future_samples)
         if observed_stop + 1 - k_ar < 0 or forecast_steps <= 0:
             continue
         history = features[observed_stop + 1 - k_ar : observed_stop + 1]
@@ -209,6 +217,7 @@ def forecast_example_rows(
                     "target_sample_index": int(center),
                     "sample_index": int(sample),
                     "time_sec": float(case_df["time_sec"].iloc[int(sample)]),
+                    "block_len": int(block_len),
                     "latency_samples": int(latency),
                     "forecast_start_sample_index": forecast_start_sample,
                     "forecast_start_time_sec": forecast_start_time,
@@ -223,9 +232,9 @@ def forecast_example_rows(
     return rows
 
 
-def _forecast_example_latencies(future_context: int) -> np.ndarray:
+def _forecast_example_latencies(future_context: int, latencies: list[int]) -> np.ndarray:
     max_forecast_latency = max(int(future_context) - 1, 0)
-    requested = np.asarray([0, 1024, 2048], dtype=int)
+    requested = np.asarray(latencies or [0], dtype=int)
     return np.unique(requested[requested <= max_forecast_latency])
 
 

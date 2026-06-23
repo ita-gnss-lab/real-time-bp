@@ -17,6 +17,7 @@ from real_time_bp.scripts.near_real_time.heatmap import compute_heatmap
 from real_time_bp.scripts.near_real_time.metrics import (
     compute_practical_case_task,
     iter_practical_tasks,
+    select_forecast_case_id,
 )
 from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.parallel import ordered_parallel_map
@@ -34,6 +35,8 @@ from real_time_bp.utils.stage import (
 
 STAGE_DIR = "04_near_real_time"
 VAR_ORDERS_CSV = "near_real_time_var_orders.csv"
+VAR_RESIDUAL_SUMMARY_CSV = "near_real_time_var_residual_summary.csv"
+VAR_FORECAST_UTILITY_CSV = "near_real_time_var_forecast_utility.csv"
 PRACTICAL_METRICS_CSV = "near_real_time_practical_metrics.csv"
 PHASE_EXAMPLE_CSV = "near_real_time_phase_example.csv"
 FORECAST_EXAMPLE_CSV = "near_real_time_forecast_example.csv"
@@ -62,6 +65,9 @@ def main() -> None:
     chunksize = csv_chunksize_from_params(params)
     tf_estimates = load_amplitude_tf_estimates()
     representative_case_ids = set(load_representative_case_ids().values())
+    forecast_case_id = select_forecast_case_id(params, paths, tf_estimates)
+    if forecast_case_id is not None:
+        logger.info("Using tracking case {} for the VAR forecast example", forecast_case_id)
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
     total_cases = count_cases(
@@ -71,6 +77,8 @@ def main() -> None:
     )
 
     var_order_rows: list[dict] = []
+    var_residual_summary_rows: list[dict] = []
+    var_forecast_utility_rows: list[dict] = []
     practical_rows: list[dict] = []
     example_rows: list[dict] = []
     forecast_rows: list[dict] = []
@@ -88,6 +96,7 @@ def main() -> None:
         wavelength_m,
         tf_estimates,
         representative_case_ids,
+        forecast_case_id,
     )
     result_iter = ordered_parallel_map(
         compute_practical_case_task,
@@ -103,6 +112,8 @@ def main() -> None:
         if result is None:
             continue
         var_order_rows.append(result["var_order_row"])
+        var_residual_summary_rows.extend(result["var_residual_summary_rows"])
+        var_forecast_utility_rows.extend(result["var_forecast_utility_rows"])
         practical_rows.append(result["practical_row"])
         example_rows.extend(result["example_rows"])
         forecast_rows.extend(result["forecast_rows"])
@@ -125,6 +136,16 @@ def main() -> None:
         pd.DataFrame(var_order_rows),
         out_dir / VAR_ORDERS_CSV,
         ["tracking_case_id"],
+    )
+    write_sorted_csv(
+        pd.DataFrame(var_residual_summary_rows),
+        out_dir / VAR_RESIDUAL_SUMMARY_CSV,
+        ["tracking_case_id", "requested_whiteness_lag"],
+    )
+    write_sorted_csv(
+        pd.DataFrame(var_forecast_utility_rows),
+        out_dir / VAR_FORECAST_UTILITY_CSV,
+        ["tracking_case_id", "forecast_horizon_samples"],
     )
     write_sorted_csv(
         pd.DataFrame(practical_rows),

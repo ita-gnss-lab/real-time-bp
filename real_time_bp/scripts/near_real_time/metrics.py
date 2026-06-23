@@ -28,6 +28,8 @@ from real_time_bp.scripts.near_real_time.examples import (
     forecast_example_rows,
     phase_example_rows,
 )
+from real_time_bp.utils.io import load_case_index
+from real_time_bp.utils.representatives import SEVERITY_ORDER
 from real_time_bp.utils.stage import case_keys, is_representative_case
 
 
@@ -37,6 +39,7 @@ def iter_practical_tasks(
     wavelength_m: float,
     tf_estimates: dict[int, float],
     representative_case_ids: set[int],
+    forecast_case_id: int | None = None,
 ):
     """Yield practical BP tasks with representative-example flags.
 
@@ -52,6 +55,8 @@ def iter_practical_tasks(
         wavelength_m: Carrier wavelength in meters.
         tf_estimates: Fresnel-time estimates keyed by tracking case id.
         representative_case_ids: Explicit case ids selected for examples.
+        forecast_case_id: Optional preselected tracking case id for the VAR
+            forecast example.
 
     Yields:
         Tuples consumed by `compute_practical_case_task`.
@@ -73,13 +78,15 @@ def iter_practical_tasks(
             phase_example_severities.add(severity)
 
         include_forecast_example = False
-        if not forecast_example_selected and severity == "strong":
+        if forecast_case_id is not None:
+            include_forecast_example = case_id == int(forecast_case_id)
+        elif not forecast_example_selected and severity == "strong":
             c_n0 = metadata.get("input_c_n0_db_hz")
             if forecast_c_n0 is None:
                 include_forecast_example = is_representative_case(metadata, experiments)
             else:
                 include_forecast_example = bool(
-                    np.isfinite(c_n0) and abs(float(c_n0) - float(forecast_c_n0)) < 1e-6
+                    np.isfinite(c_n0) and float(c_n0) >= float(forecast_c_n0)
                 )
         if include_forecast_example:
             forecast_example_selected = True
@@ -92,6 +99,59 @@ def iter_practical_tasks(
             include_phase_example,
             include_forecast_example,
         )
+
+
+def select_forecast_case_id(
+    params: dict,
+    paths,
+    tf_estimates: dict[int, float] | None = None,
+) -> int | None:
+    """Select a robust strong-scintillation case for the VAR forecast figure.
+
+    Args:
+        params: Parsed `params.yaml` dictionary.
+        paths: Resolved dataset paths.
+        tf_estimates: Optional Fresnel-time estimates keyed by tracking case id.
+
+    Returns:
+        Tracking case id closest to the requested forecast C/N0, or None when
+        the dataset index is unavailable.
+    """
+    case_index = load_case_index(paths)
+    if case_index.empty or "tracking_case_id" not in case_index.columns:
+        return None
+    experiments = params.get("experiments", {})
+    near_cfg = params.get("near_real_time", {})
+    candidates = case_index.drop_duplicates("tracking_case_id").copy()
+    severity_filter = set(experiments.get("severities") or [])
+    if severity_filter and "severity" in candidates:
+        candidates = candidates[candidates["severity"].astype(str).isin(severity_filter)]
+    if tf_estimates:
+        candidates = candidates[candidates["tracking_case_id"].astype(int).isin(set(tf_estimates))]
+    if "severity" in candidates and candidates["severity"].astype(str).eq("strong").any():
+        candidates = candidates[candidates["severity"].astype(str).eq("strong")]
+    if candidates.empty:
+        return None
+    target_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
+    if target_c_n0 is not None and "input_c_n0_db_hz" in candidates:
+        candidates["_c_n0_distance"] = (
+            pd.to_numeric(candidates["input_c_n0_db_hz"], errors="coerce") - float(target_c_n0)
+        ).abs()
+    else:
+        candidates["_c_n0_distance"] = 0.0
+    if "severity" in candidates:
+        candidates["_severity_order"] = pd.Categorical(
+            candidates["severity"].astype(str),
+            categories=SEVERITY_ORDER,
+            ordered=True,
+        )
+    sort_columns = [
+        column
+        for column in ["_severity_order", "_c_n0_distance", "tracking_case_id"]
+        if column in candidates.columns
+    ]
+    selected = candidates.sort_values(sort_columns).iloc[0]
+    return int(selected["tracking_case_id"])
 
 
 def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
@@ -241,6 +301,18 @@ def compute_practical_case(
         "var_bic": float(var_result.bic),
         "var_aic": float(var_result.aic),
     }
+    var_residual_summary_rows = _var_residual_summary_rows(
+        metadata,
+        var_result,
+        near_cfg,
+    )
+    var_forecast_utility_rows = _var_forecast_utility_rows(
+        metadata,
+        signal,
+        var_result,
+        n_init,
+        near_cfg,
+    )
     example_rows = (
         phase_example_rows(
             metadata,
@@ -259,7 +331,15 @@ def compute_practical_case(
         else []
     )
     forecast_rows = (
-        forecast_example_rows(metadata, case_df, signal, true_signal, var_result, block_len)
+        forecast_example_rows(
+            metadata,
+            case_df,
+            signal,
+            true_signal,
+            var_result,
+            int(near_cfg.get("forecast_example_block_len", block_len)),
+            [int(value) for value in near_cfg.get("forecast_example_latency_samples", [0])],
+        )
         if include_forecast_example
         else []
     )
@@ -268,4 +348,130 @@ def compute_practical_case(
         "practical_row": practical_row,
         "example_rows": example_rows,
         "forecast_rows": forecast_rows,
+        "var_residual_summary_rows": var_residual_summary_rows,
+        "var_forecast_utility_rows": var_forecast_utility_rows,
     }
+
+
+def _var_residual_summary_rows(metadata: dict, var_result, near_cfg: dict) -> list[dict]:
+    """Summarize residual whiteness and autocorrelation effect size.
+
+    Main paper:
+        Results Section III.3 treats VAR as a practical short-horizon
+        predictor. These diagnostics report whether predictable residual
+        structure remains, without relying on Gaussianity as a requirement.
+    """
+    residuals = np.asarray(var_result.resid, dtype=float)
+    max_acf_lag = int(near_cfg.get("var_whiteness_test_lags", 24))
+    acf_energy = _mean_component_acf_energy(residuals, max_acf_lag)
+    rows = []
+    for requested_lag in near_cfg.get("var_diagnostic_whiteness_lags", [24]):
+        effective_lag = max(int(requested_lag), int(var_result.k_ar) + 1)
+        pvalue = _whiteness_pvalue(var_result, effective_lag)
+        rows.append(
+            {
+                **case_keys(metadata),
+                "var_order_bic": int(var_result.k_ar),
+                "requested_whiteness_lag": int(requested_lag),
+                "effective_whiteness_lag": int(effective_lag),
+                "whiteness_pvalue": pvalue,
+                "minus_log10_whiteness_pvalue": _minus_log10(pvalue),
+                "residual_acf_energy": acf_energy,
+            }
+        )
+    return rows
+
+
+def _var_forecast_utility_rows(
+    metadata: dict,
+    signal: np.ndarray,
+    var_result,
+    n_init: int,
+    near_cfg: dict,
+) -> list[dict]:
+    """Compare VAR forecasts against persistence over the full dataset.
+
+    Main paper:
+        Methodology Section II.5 uses the VAR only to fill unavailable future
+        samples. The forecast RMSE ratio checks whether that fill is better
+        than the simplest persistence baseline at each horizon.
+    """
+    horizons = sorted(
+        {
+            int(value)
+            for value in near_cfg.get("var_forecast_horizons_samples", [1, 4, 16, 64, 256])
+            if int(value) > 0
+        }
+    )
+    if not horizons:
+        return []
+    max_horizon = max(horizons)
+    features = np.column_stack([np.real(signal), np.imag(signal)])
+    k_ar = int(var_result.k_ar)
+    origin_start = max(int(n_init), k_ar - 1)
+    origin_stop = features.shape[0] - max_horizon - 1
+    if origin_stop <= origin_start:
+        return []
+    max_eval = max(int(near_cfg.get("var_forecast_eval_samples", 32)), 1)
+    origins = np.linspace(origin_start, origin_stop, max_eval, dtype=int)
+    origins = np.unique(origins)
+    squared_var_errors = {horizon: [] for horizon in horizons}
+    squared_persistence_errors = {horizon: [] for horizon in horizons}
+    for origin in origins:
+        history = features[origin - k_ar + 1 : origin + 1]
+        forecast = var_result.forecast(history, steps=max_horizon)
+        current = features[origin]
+        for horizon in horizons:
+            target = features[origin + horizon]
+            squared_var_errors[horizon].append(
+                float(np.sum((target - forecast[horizon - 1]) ** 2))
+            )
+            squared_persistence_errors[horizon].append(float(np.sum((target - current) ** 2)))
+
+    rows = []
+    for horizon in horizons:
+        var_rmse = float(np.sqrt(np.nanmean(squared_var_errors[horizon])))
+        persistence_rmse = float(np.sqrt(np.nanmean(squared_persistence_errors[horizon])))
+        ratio = var_rmse / persistence_rmse if persistence_rmse > 0 else np.nan
+        rows.append(
+            {
+                **case_keys(metadata),
+                "var_order_bic": int(var_result.k_ar),
+                "forecast_horizon_samples": int(horizon),
+                "forecast_eval_origins": int(origins.size),
+                "var_forecast_rmse": var_rmse,
+                "persistence_forecast_rmse": persistence_rmse,
+                "var_to_persistence_rmse_ratio": ratio,
+            }
+        )
+    return rows
+
+
+def _mean_component_acf_energy(residuals: np.ndarray, max_lag: int) -> float:
+    energies = []
+    for component_idx in range(residuals.shape[1]):
+        values = residuals[:, component_idx]
+        values = values[np.isfinite(values)]
+        values = values - np.nanmean(values)
+        denom = float(np.dot(values, values))
+        if denom <= 0:
+            continue
+        energy = 0.0
+        for lag in range(1, min(int(max_lag), values.size - 1) + 1):
+            rho = float(np.dot(values[:-lag], values[lag:]) / denom)
+            energy += rho * rho
+        energies.append(energy)
+    return float(np.nanmean(energies)) if energies else np.nan
+
+
+def _whiteness_pvalue(var_result, lag: int) -> float:
+    try:
+        return float(var_result.test_whiteness(nlags=int(lag), signif=0.05).pvalue)
+    except Exception:
+        return float("nan")
+
+
+def _minus_log10(value: float) -> float:
+    if not np.isfinite(value):
+        return np.nan
+    return float(-np.log10(max(float(value), np.finfo(float).tiny)))

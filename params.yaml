@@ -25,22 +25,9 @@ experiments:
   # Paper: Results Section III.2; this sweep justifies the fixed
   # N_init used in the remaining filter-bank/near-real-time experiments.
   n_init_sweep_samples:
-    - 512
-    - 1024
-    - 1536
-    - 2048
-    - 2560
-    - 3072
-    - 3584
-    - 4096
-    - 4608
-    - 5120
-    - 5632
-    - 6144
-    - 6656
-    - 7168
-    - 7680
-    - 8192
+    min: 512
+    max: 16384
+    step: 512
   n_init_samples_boxplot: 8192
   # Paper: Methodology Section II.4; candidate grid
   # T={T_F,1,...,T_F,P}, using the 0.5--2.0 s domain from the dataset design.
@@ -75,26 +62,15 @@ near_real_time:
   # Paper: Results Section III.3, Figure 11; heatmap over
   # FFT length M and latency L / (M - M_c - 1).
   fft_m_values:
-    - 256
-    - 512
-    - 768
-    - 1024
-    - 1280
-    - 1536
-    - 1792
-    - 2048
+    min: 256
+    max: 2048
+    step: 128
   # Paper: Figure 11 varies L from 0 to M-M_c-1. Fractions compare latency
   # across different M without mixing incompatible absolute sample counts.
   heatmap_latency_fractions:
-    - 0.0
-    - 0.125
-    - 0.25
-    - 0.375
-    - 0.5
-    - 0.625
-    - 0.75
-    - 0.875
-    - 1.0
+    min: 0.0
+    max: 1.0
+    step: 0.05
   # Paper: Figure 11 is an aggregate diagnostic; this many evenly spaced
   # time samples are evaluated per M/L cell to keep the DVC stage tractable.
   heatmap_eval_samples: 750
@@ -107,8 +83,25 @@ near_real_time:
   residual_doppler_error_count: 16
   var_test_alpha: 0.05
   var_whiteness_test_lags: 24
+  var_diagnostic_whiteness_lags:
+    - 6
+    - 12
+    - 24
+  var_diagnostic_plot_whiteness_lag: 24
+  var_forecast_horizons_samples:
+    - 1
+    - 4
+    - 16
+    - 64
+    - 256
+  var_forecast_eval_samples: 32
   heatmap_max_cases_per_severity: 1
   forecast_example_c_n0_db_hz: 35.0
+  forecast_example_block_len: 8192
+  forecast_example_latency_samples:
+    - 0
+    - 1024
+    - 2048
   example_ml_configs:
     - block_len: 2048
       latency_samples: 0
@@ -118,6 +111,6 @@ near_real_time:
 plots:
   csv_dir: results/csv
   figures_dir: results/figures
-  forecast_zoom_start_s: 70.0
-  forecast_zoom_end_s: 80.0
+  forecast_zoom_start_s:
+  forecast_zoom_end_s:
   forecast_zoom_latency_samples: 0

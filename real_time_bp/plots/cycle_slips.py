@@ -235,9 +235,10 @@ def plot_cycle_slips() -> None:
                 )
         error_ax.set_xlabel("Time [sec]")
         error_ax.set_ylabel("Phase differences [cycles]")
-    handles, labels = _unique_legend_items(axes[:, :-1].ravel())
-    if handles:
-        legend_axes[1].legend(handles, labels, loc="center left", frameon=False)
+    for row, legend_ax in enumerate(legend_axes):
+        handles, labels = _unique_legend_items(axes[row, :-1])
+        if handles:
+            legend_ax.legend(handles, labels, loc="center left")
     fig.savefig(out_dir / "tvd_example_traces.pdf")
     remove_figure(filter_dir / "representative_phase_retrieval.pdf")
     plt.close(fig)

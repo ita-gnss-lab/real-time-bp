@@ -24,6 +24,7 @@ from real_time_bp.scripts.near_real_time.common import (
 )
 from real_time_bp.utils.io import count_cases, iter_case_dataframes, load_case_index
 from real_time_bp.utils.parallel import ordered_parallel_map
+from real_time_bp.utils.params import fixed_step_values
 from real_time_bp.utils.progress import progress_iter
 from real_time_bp.utils.representatives import SEVERITY_ORDER
 from real_time_bp.utils.stage import (
@@ -271,22 +272,19 @@ def _heatmap_cell_count(m_grid: np.ndarray, latency_fractions: np.ndarray) -> in
 
 
 def _m_grid_from_params(near_cfg: dict) -> np.ndarray:
-    values = near_cfg.get("fft_m_values")
-    if values:
-        return np.asarray(sorted({int(value) for value in values}), dtype=int)
-    return np.linspace(
-        int(near_cfg.get("fft_m_min", 512)),
-        int(near_cfg.get("fft_m_max", 8192)),
-        int(near_cfg.get("fft_m_count", 16)),
+    return fixed_step_values(
+        near_cfg.get("fft_m_values"),
+        default=[512, 1024, 1536, 2048],
         dtype=int,
     )
 
 
 def _latency_fractions_from_params(near_cfg: dict) -> np.ndarray:
-    values = near_cfg.get("heatmap_latency_fractions")
-    if values:
-        return np.asarray(sorted({float(value) for value in values}), dtype=float)
-    return np.linspace(0.0, 1.0, 8)
+    return fixed_step_values(
+        near_cfg.get("heatmap_latency_fractions"),
+        default=[0.0, 0.25, 0.5, 0.75, 1.0],
+        dtype=float,
+    )
 
 
 def _latency_grid(future_context: int, latency_fractions: np.ndarray) -> list[tuple[float, int]]:

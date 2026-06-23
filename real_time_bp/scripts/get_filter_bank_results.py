@@ -36,7 +36,7 @@ from real_time_bp.methodology.tvd import tvd_integer_bias
 from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.output_rows import sampled_time_rows
 from real_time_bp.utils.parallel import ordered_parallel_map
-from real_time_bp.utils.params import load_params
+from real_time_bp.utils.params import fixed_step_values, load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
 from real_time_bp.utils.representatives import (
     load_representative_case_ids,
@@ -429,7 +429,12 @@ def _compute_n_init_sensitivity(
     max_cases = optional_int(experiments.get("n_init_sweep_max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
-    for n_init in experiments.get("n_init_sweep_samples", [4096]):
+    n_init_values = fixed_step_values(
+        experiments.get("n_init_sweep_samples"),
+        default=[int(experiments.get("n_init_samples", 4096))],
+        dtype=int,
+    )
+    for n_init in n_init_values:
         logger.info("Computing N_init sensitivity for N_init={}", n_init)
         estimate_rows: list[dict] = []
         downstream_rows: list[dict] = []

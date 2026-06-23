@@ -10,8 +10,8 @@ stages:
     outs:
     - path: data/raw/backpropagation
       hash: md5
-      md5: 39be6a6322a8f98ac2ce6eda867262a2.dir
-      size: 2340865673
+      md5: da77e86076fd85e6f9974d2f760103d0.dir
+      size: 4928392382
       nfiles: 10
   dataset_summary:
     cmd: uv run python -m real_time_bp.scripts.get_dataset_summary
