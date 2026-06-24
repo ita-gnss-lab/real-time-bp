@@ -1,5 +1,0 @@
-method,forecast_model,block_len,window,var_lag_order,latency_samples,latency_s,forecast_steps,phi_R_num_valid_samples,phi_R_field_rel_error,phi_R_amp_rmse,phi_R_phase_rmse_rad,full_noncausal_reference_num_valid_samples,full_noncausal_reference_field_rel_error,full_noncausal_reference_amp_rmse,full_noncausal_reference_phase_rmse_rad
-Sliding Window BP with VAR Forecasting,real_imag_var,1024,rectangular,4.0,0,0.0,511,3000,0.5374887579090531,0.39791514400008676,0.6568046903656022,3000,0.5319430469088422,0.3956794351080291,0.6507328081899321
-Sliding Window BP with VAR Forecasting,real_imag_var,1024,rectangular,4.0,32,0.32,479,3000,0.4405549529857214,0.3212762238646057,0.4566616297469266,3000,0.43658320251202243,0.32219632221986344,0.4517644762315048
-Sliding Window BP with VAR Forecasting,real_imag_var,1024,rectangular,4.0,64,0.64,447,3000,0.3494384438081044,0.263702924584546,0.297671971363726,3000,0.34348993042967646,0.26221645977125296,0.2926298596557157
-Full Noncausal Sliding Window BP,real_imag_var,1024,rectangular,,511,5.11,0,3000,0.082527016007409,0.0561754185020423,0.060821042596985044,3000,0.0,0.0,1.603083175588705e-17

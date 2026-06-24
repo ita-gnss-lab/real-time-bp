@@ -1,4 +1,0 @@
-method,block_len,latency_samples,backprop_stride_samples,forecast_steps,num_valid_samples,field_rel_error,amp_rmse,phase_rmse_rad
-GRU forecasted estimated scintillation,1024,64,1,447,14116770,0.4323638677597046,0.3018193542957306,0.4647384583950043
-Full estimated scintillation window,1024,511,1,0,14116770,0.21944227814674377,0.1350526362657547,0.18651364743709564
-Exact postpropagated window,1024,511,1,0,14116770,0.20494286715984344,0.12355644255876541,0.17642971873283386

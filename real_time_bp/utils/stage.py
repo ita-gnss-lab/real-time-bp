@@ -9,7 +9,7 @@ from loguru import logger
 import numpy as np
 import pandas as pd
 
-from real_time_bp.config import CSV_RESULTS_DIR, FIGURES_DIR
+from real_time_bp.config import CSV_TABLES_DIR, FIGURES_DIR, OUTPUTS_DIR
 from real_time_bp.methodology.constants import carrier_wavelength_m
 from real_time_bp.utils.representatives import sort_by_severity
 
@@ -28,15 +28,27 @@ def ensure_dir(path: Path) -> Path:
 
 
 def csv_stage_dir(name: str) -> Path:
-    """Return and create a CSV result stage directory.
+    """Return and create an operational CSV output stage directory.
 
     Args:
-        name: Stage subdirectory below `results/csv`.
+        name: Stage subdirectory below `outputs`.
 
     Returns:
         Created stage directory path.
     """
-    return ensure_dir(CSV_RESULTS_DIR / name)
+    return ensure_dir(OUTPUTS_DIR / name)
+
+
+def csv_table_dir(name: str = "") -> Path:
+    """Return and create a paper-facing CSV table directory.
+
+    Args:
+        name: Optional subdirectory below `results/csv_tables`.
+
+    Returns:
+        Created table directory path.
+    """
+    return ensure_dir(CSV_TABLES_DIR / name) if name else ensure_dir(CSV_TABLES_DIR)
 
 
 def figure_stage_dir(name: str) -> Path:
@@ -193,6 +205,8 @@ def is_loss_of_lock(metadata: dict) -> bool:
     """
     value = metadata.get("loss_of_lock", False)
     if value is None:
+        return False
+    if pd.isna(value):
         return False
     if isinstance(value, str):
         return value.strip().lower() in {"1", "true", "yes"}

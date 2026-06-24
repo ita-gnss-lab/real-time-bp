@@ -39,7 +39,6 @@ TRACE_COLUMNS = [
     "sample_index",
     "time_sec",
     "intensity_db",
-    "diffractive_phase_cycles",
     "estimated_diffractive_phase_cycles",
     "true_diffractive_phase_cycles",
     "integer_cycle_bias",
@@ -163,7 +162,6 @@ def _compute_tvd_trace_rows(
         metadata_keys,
         lambda idx: {
             "intensity_db": float(intensity_db[idx]),
-            "diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
             "estimated_diffractive_phase_cycles": float(estimated_diffractive_cycles[idx]),
             "true_diffractive_phase_cycles": float(true_diffractive_cycles[idx]),
             "integer_cycle_bias": int(integer_cycle_bias[idx]),

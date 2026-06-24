@@ -127,7 +127,8 @@ def phase_rmse_rad(reference_phase_rad: np.ndarray, estimate_phase_rad: np.ndarr
 
     Main paper:
         Results Section III.2, Eq. (22), defines the per-case wrapped phase
-        RMSE that is later averaged into MRMSE_phi_r.
+        RMSE. Result plots average those per-case values into the reported
+        MRMSE curves.
 
     Args:
         reference_phase_rad: Reference phase samples in radians.

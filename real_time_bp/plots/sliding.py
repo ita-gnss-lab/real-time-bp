@@ -9,7 +9,7 @@ from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
 
-from real_time_bp.plots.common import column, placeholder, read_csv, remove_figure, save_figure
+from real_time_bp.plots.common import placeholder, read_csv, save_figure
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import (
     COLORS,
@@ -44,9 +44,6 @@ def plot_sliding() -> None:
     _plot_latency_heatmap(heatmap, out_dir / "latency_heatmap.pdf")
     _plot_phase_example(phase, out_dir / "sliding_phase_example.pdf")
     _plot_forecast_example(forecast, out_dir / "var_forecast_example.pdf")
-    remove_figure(out_dir / "var_model_diagnostics.pdf")
-    remove_figure(out_dir / "var_residual_diagnostics.pdf")
-    remove_figure(out_dir / "var_residual_pacf.pdf")
 
 
 def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
@@ -82,42 +79,22 @@ def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
 
     Main paper:
         Results Figure 12 compares the noncausal batch BP reference with the
-        practical sliding BP operating point. The first panel reports
-        MRMSE_phi_r after BP and the tracked MRMSE_phi_s baseline before BP.
+        practical sliding BP operating point. The first panel reports the
+        mean across cases using MRMSE_phi_r^(a), where
+        a is batch or sliding, and MRMSE_phi_s for the tracked baseline before
+        BP.
         The second panel reports TVD-derived cycle-slip rates.
     """
     if df.empty:
         placeholder(path, "No practical sliding metric data")
         return
     fig, axes = plt.subplots(1, 2, figsize=figure_size("two_panel"), sharex=False)
-    batch_col = _first_column(
-        df,
-        "batch_mrmse_phi_r_rad",
-        "batch_refractive_phase_rmse_rad",
-        "batch_phase_rmse_rad",
-    )
-    sliding_col = _first_column(
-        df,
-        "sliding_mrmse_phi_r_rad",
-        "sliding_refractive_phase_rmse_rad",
-        "sliding_phase_rmse_rad",
-    )
-    tracked_col = _optional_column(df, "tracked_mrmse_phi_s_rad")
-    batch_cs_col = _first_column(
-        df,
-        "batch_cs_per_min",
-        "batch_cycle_slips_per_minute",
-    )
-    sliding_cs_col = _first_column(
-        df,
-        "sliding_cs_per_min",
-        "sliding_cycle_slips_per_minute",
-    )
-    tracked_cs_col = _optional_column(
-        df,
-        "tracked_cs_per_min",
-        "tracked_cycle_slips_per_minute",
-    )
+    batch_col = "batch_rmse_phi_r_rad"
+    sliding_col = "sliding_rmse_phi_r_rad"
+    tracked_col = "tracked_rmse_phi_s_rad"
+    batch_cs_col = "batch_cs_per_min"
+    sliding_cs_col = "sliding_cs_per_min"
+    tracked_cs_col = "tracked_cs_per_min"
     n_value = (
         int(df["n_init_samples"].dropna().iloc[0])
         if "n_init_samples" in df and df["n_init_samples"].notna().any()
@@ -134,35 +111,37 @@ def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
         else None
     )
     for severity, group in severity_groups(df):
-        metric_cols = [batch_col, sliding_col, batch_cs_col, sliding_cs_col]
-        if tracked_col is not None:
-            metric_cols.append(tracked_col)
-        if tracked_cs_col is not None:
-            metric_cols.append(tracked_cs_col)
+        metric_cols = [
+            batch_col,
+            sliding_col,
+            tracked_col,
+            batch_cs_col,
+            sliding_cs_col,
+            tracked_cs_col,
+        ]
         clean = _mean_by_c_n0(group, metric_cols)
         color = SEVERITY_COLORS.get(str(severity), COLORS["sliding"])
-        if tracked_col is not None:
-            axes[0].plot(
-                clean["input_c_n0_db_hz"],
-                clean[tracked_col],
-                color=color,
-                linestyle=":",
-                linewidth=1.2,
-                label=rf"{severity} $\mathrm{{MRMSE}}_{{\phi_s}}$",
-            )
+        axes[0].plot(
+            clean["input_c_n0_db_hz"],
+            clean[tracked_col],
+            color=color,
+            linestyle=":",
+            linewidth=1.2,
+            label=rf"{severity} $\mathrm{{MRMSE}}_{{\phi_s}}$",
+        )
         axes[0].plot(
             clean["input_c_n0_db_hz"],
             clean[batch_col],
             color=color,
             linestyle="--",
             alpha=0.75,
-            label=rf"{severity} batch $\mathrm{{MRMSE}}_{{\phi_r}}$",
+            label=rf"{severity} $\mathrm{{MRMSE}}_{{\phi_r}}^{{(\mathrm{{batch}})}}$",
         )
         axes[0].plot(
             clean["input_c_n0_db_hz"],
             clean[sliding_col],
             color=color,
-            label=rf"{severity} sliding $\mathrm{{MRMSE}}_{{\phi_r}}$",
+            label=rf"{severity} $\mathrm{{MRMSE}}_{{\phi_r}}^{{(\mathrm{{sliding}})}}$",
         )
         axes[1].plot(
             clean["input_c_n0_db_hz"],
@@ -178,17 +157,16 @@ def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
             color=color,
             label=rf"{severity} sliding BP",
         )
-        if tracked_cs_col is not None:
-            axes[1].plot(
-                clean["input_c_n0_db_hz"],
-                clean[tracked_cs_col],
-                color=color,
-                linestyle=":",
-                linewidth=1.2,
-                label=rf"{severity} TVD $\hat{{\phi}}_s-\phi_r$",
-            )
+        axes[1].plot(
+            clean["input_c_n0_db_hz"],
+            clean[tracked_cs_col],
+            color=color,
+            linestyle=":",
+            linewidth=1.2,
+            label=rf"{severity} TVD $\hat{{\phi}}_s-\phi_r$",
+        )
     axes[0].set_xlabel(r"$C/N_0$ [dB-Hz]")
-    axes[0].set_ylabel(r"MRMSE [rad]")
+    axes[0].set_ylabel(r"$\mathrm{MRMSE}$ [rad]")
     axes[1].set_xlabel(r"$C/N_0$ [dB-Hz]")
     axes[1].set_ylabel("CS/min")
     for ax in axes:
@@ -209,8 +187,8 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
     if df.empty:
         placeholder(path, "No latency heatmap data")
         return
-    metric_col = column(df, "refractive_phase_rmse_rad", "phase_rmse_rad")
-    x_col = "latency_fraction" if "latency_fraction" in df.columns else "latency_samples"
+    metric_col = "refractive_phase_rmse_rad"
+    x_col = "latency_fraction"
     severities = [
         severity for severity in SEVERITY_ORDER if severity in set(df["severity"].astype(str))
     ]
@@ -241,7 +219,12 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
         )
         for row, (pivot, vmin, vmax, title) in enumerate(
             [
-                (metric_pivot, metric_vmin, metric_vmax, r"MRMSE $\hat{\phi}_r$ [rad]"),
+                (
+                    metric_pivot,
+                    metric_vmin,
+                    metric_vmax,
+                    r"$\mathrm{MRMSE}_{\phi_r}^{(\mathrm{sliding})}$ [rad]",
+                ),
                 (cs_pivot, cs_vmin, cs_vmax, "CS/min"),
             ]
         ):
@@ -289,7 +272,10 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
             )
     if metric_image is not None:
         fig.colorbar(
-            metric_image, ax=axes[0, :], label=r"MRMSE $\hat{\phi}_r$ [rad]", fraction=0.03
+            metric_image,
+            ax=axes[0, :],
+            label=r"$\mathrm{MRMSE}_{\phi_r}^{(\mathrm{sliding})}$ [rad]",
+            fraction=0.03,
         )
     if cs_image is not None:
         fig.colorbar(cs_image, ax=axes[1, :], label="CS/min", fraction=0.03)
@@ -360,8 +346,7 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
             if first_config is not None
             else severity_group
         )
-        batch_error_col = column(base, "batch_refractive_phase_error_rad", "batch_phase_error_rad")
-        batch_error_cycles = base[batch_error_col] / (2.0 * np.pi)
+        batch_error_cycles = base["batch_refractive_phase_error_rad"] / (2.0 * np.pi)
         if "estimated_scintillation_minus_refractive_rad" in base:
             diffractive_cycles = base["estimated_scintillation_minus_refractive_rad"] / (
                 2.0 * np.pi
@@ -379,11 +364,7 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 linewidth=1.0,
                 label=r"$\hat{\phi}_s-\phi_r$",
             )
-        sliding_col = column(
-            severity_group,
-            "sliding_refractive_phase_error_rad",
-            "sliding_phase_error_rad",
-        )
+        sliding_col = "sliding_refractive_phase_error_rad"
         config_groups = severity_group.sort_values(["latency_samples", "sample_index"]).groupby(
             "latency_samples", sort=True
         )
@@ -603,20 +584,6 @@ def _forecast_start(group: pd.DataFrame) -> float | None:
         starts = pd.to_numeric(group["forecast_start_sample_index"], errors="coerce").dropna()
         if not starts.empty:
             return float(starts.iloc[0])
-    return None
-
-
-def _first_column(df: pd.DataFrame, *names: str) -> str:
-    for name in names:
-        if name in df.columns:
-            return name
-    return names[-1]
-
-
-def _optional_column(df: pd.DataFrame, *names: str) -> str | None:
-    for name in names:
-        if name in df.columns:
-            return name
     return None
 
 

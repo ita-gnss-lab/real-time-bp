@@ -25,17 +25,23 @@ from real_time_bp.methodology.sliding import (
     sliding_window_bp_with_var_forecast,
 )
 from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute
-from real_time_bp.scripts.sliding.common import quality_valid_case_ids, valid_eval_indices
+from real_time_bp.scripts.sliding.common import (
+    quality_valid_case_ids,
+    valid_eval_indices,
+    valid_eval_slice,
+)
 from real_time_bp.scripts.sliding.examples import (
     forecast_example_rows,
     phase_example_rows,
 )
-from real_time_bp.utils.io import load_case_index
-from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.io import filter_loss_of_lock_case_index, load_case_index
+from real_time_bp.utils.quality import (
+    evaluate_analysis_quality,
+    exclude_loss_of_lock_enabled,
+)
 from real_time_bp.utils.representatives import SEVERITY_ORDER
 from real_time_bp.utils.stage import (
     case_keys,
-    is_loss_of_lock,
     is_representative_case,
 )
 
@@ -140,10 +146,10 @@ def select_forecast_case_ids(
     experiments = params.get("experiments", {})
     sliding_cfg = params.get("sliding", {})
     candidates = case_index.drop_duplicates("tracking_case_id").copy()
-    if "loss_of_lock" in candidates.columns:
-        candidates = candidates[
-            ~candidates.apply(lambda row: is_loss_of_lock(row.to_dict()), axis=1)
-        ]
+    candidates = filter_loss_of_lock_case_index(
+        candidates,
+        exclude_loss_of_lock=exclude_loss_of_lock_enabled(params),
+    )
     severity_filter = [str(value) for value in (experiments.get("severities") or [])]
     if not severity_filter:
         severity_filter = list(SEVERITY_ORDER)
@@ -318,44 +324,39 @@ def compute_practical_case(
         var_result,
     )
     sliding_phase = median_align_phase(unwrap_phase(sliding), true_phase, n_init)
-    eval_mask = np.zeros(len(case_df), dtype=bool)
-    eval_mask[eval_indices] = True
-    eval_mask[:n_init] = False
+    eval_slice = valid_eval_slice(len(case_df), block_len, n_init)
     batch_slips, batch_slips_per_min = tvd_cycle_slips_per_minute(
-        batch_phase - true_phase,
-        intensity_db,
-        time_sec,
+        (batch_phase - true_phase)[eval_slice],
+        intensity_db[eval_slice],
+        time_sec[eval_slice],
         float(tvd_cfg.get("fade_threshold_db", -10.0)),
         float(tvd_cfg.get("allowed_jump_weight", 1.0)),
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        mask=eval_mask,
     )
     sliding_slips, sliding_slips_per_min = tvd_cycle_slips_per_minute(
-        sliding_phase - true_phase,
-        intensity_db,
-        time_sec,
+        (sliding_phase - true_phase)[eval_slice],
+        intensity_db[eval_slice],
+        time_sec[eval_slice],
         float(tvd_cfg.get("fade_threshold_db", -10.0)),
         float(tvd_cfg.get("allowed_jump_weight", 1.0)),
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        mask=eval_mask,
     )
     tracked_slips, tracked_slips_per_min = tvd_cycle_slips_per_minute(
-        aligned_estimated_scintillation_phase - true_phase,
-        intensity_db,
-        time_sec,
+        (aligned_estimated_scintillation_phase - true_phase)[eval_slice],
+        intensity_db[eval_slice],
+        time_sec[eval_slice],
         float(tvd_cfg.get("fade_threshold_db", -10.0)),
         float(tvd_cfg.get("allowed_jump_weight", 1.0)),
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        mask=eval_mask,
     )
-    batch_mrmse_phi_r = phase_rmse_rad(true_phase[eval_mask], batch_phase[eval_mask])
-    sliding_mrmse_phi_r = phase_rmse_rad(
-        true_phase[eval_mask],
-        sliding_phase[eval_mask],
+    batch_rmse_phi_r = phase_rmse_rad(true_phase[eval_slice], batch_phase[eval_slice])
+    sliding_rmse_phi_r = phase_rmse_rad(
+        true_phase[eval_slice],
+        sliding_phase[eval_slice],
     )
-    tracked_mrmse_phi_s = phase_rmse_rad(
-        true_phase[eval_mask],
-        aligned_estimated_scintillation_phase[eval_mask],
+    tracked_rmse_phi_s = phase_rmse_rad(
+        true_phase[eval_slice],
+        aligned_estimated_scintillation_phase[eval_slice],
     )
     practical_row = {
         **case_keys(metadata),
@@ -365,11 +366,9 @@ def compute_practical_case(
         "var_order_bic": var_order,
         "block_len": block_len,
         "latency_samples": latency,
-        "batch_mrmse_phi_r_rad": batch_mrmse_phi_r,
-        "sliding_mrmse_phi_r_rad": sliding_mrmse_phi_r,
-        "tracked_mrmse_phi_s_rad": tracked_mrmse_phi_s,
-        "batch_refractive_phase_rmse_rad": batch_mrmse_phi_r,
-        "sliding_refractive_phase_rmse_rad": sliding_mrmse_phi_r,
+        "batch_rmse_phi_r_rad": batch_rmse_phi_r,
+        "sliding_rmse_phi_r_rad": sliding_rmse_phi_r,
+        "tracked_rmse_phi_s_rad": tracked_rmse_phi_s,
         "batch_cycle_slip_count": batch_slips,
         "batch_cs_per_min": batch_slips_per_min,
         "batch_cycle_slips_per_minute": batch_slips_per_min,

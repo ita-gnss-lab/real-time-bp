@@ -1,2 +1,0 @@
-success,status,message,cost,optimality,nfev,njev,x_norm,elapsed_s,use_staged_continuation,num_stages
-False,0,The maximum number of function evaluations is exceeded.,0.90341559453282,0.0005395633228122684,80,80,31.908916577043904,40.35738158226013,True,5

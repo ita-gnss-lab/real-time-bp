@@ -26,7 +26,7 @@ stages:
       - constants
       - experiments
     outs:
-      - results/csv/01_dataset
+      - outputs/01_dataset
 
   filter_bank_results:
     cmd: uv run python -m real_time_bp.scripts.get_filter_bank_results
@@ -49,7 +49,7 @@ stages:
       - real_time_bp/utils/progress.py
       - real_time_bp/utils/quality.py
       - data/raw/backpropagation
-      - results/csv/01_dataset
+      - outputs/01_dataset
     params:
       - dataset
       - runtime
@@ -58,13 +58,13 @@ stages:
       - quality_control
       - tvd
     outs:
-      - results/csv/03_filter_bank/filter_bank_score_curves.csv
-      - results/csv/03_filter_bank/filter_bank_estimates.csv
-      - results/csv/03_filter_bank/filter_bank_downstream_phase_metrics.csv
-      - results/csv/03_filter_bank/filter_bank_tf_error_metrics.csv
-      - results/csv/03_filter_bank/filter_bank_downstream_summary.csv
-      - results/csv/03_filter_bank/filter_bank_n_init_sensitivity.csv
-      - results/csv/03_filter_bank/filter_bank_boxplot_estimates.csv
+      - outputs/03_filter_bank/filter_bank_score_curves.csv
+      - outputs/03_filter_bank/filter_bank_estimates.csv
+      - outputs/03_filter_bank/filter_bank_downstream_phase_metrics.csv
+      - outputs/03_filter_bank/filter_bank_tf_error_metrics.csv
+      - outputs/03_filter_bank/filter_bank_downstream_summary.csv
+      - outputs/03_filter_bank/filter_bank_n_init_sensitivity.csv
+      - outputs/03_filter_bank/filter_bank_boxplot_estimates.csv
 
   sliding_results:
     cmd: uv run python -m real_time_bp.scripts.get_sliding_results
@@ -73,9 +73,7 @@ stages:
       - real_time_bp/config.py
       - real_time_bp/scripts/get_sliding_results.py
       - real_time_bp/scripts/sliding/common.py
-      - real_time_bp/scripts/sliding/diagnostics.py
       - real_time_bp/scripts/sliding/examples.py
-      - real_time_bp/scripts/sliding/heatmap.py
       - real_time_bp/scripts/sliding/metrics.py
       - real_time_bp/utils/stage.py
       - real_time_bp/methodology/backpropagation.py
@@ -93,8 +91,8 @@ stages:
       - real_time_bp/utils/progress.py
       - real_time_bp/utils/quality.py
       - data/raw/backpropagation
-      - results/csv/01_dataset
-      - results/csv/03_filter_bank/filter_bank_estimates.csv
+      - outputs/01_dataset
+      - outputs/03_filter_bank/filter_bank_estimates.csv
     params:
       - dataset
       - runtime
@@ -104,29 +102,21 @@ stages:
       - sliding.var_order_max
       - sliding.practical_fft_m
       - sliding.practical_latency_samples
-      - sliding.residual_doppler_error_hz_min
-      - sliding.residual_doppler_error_hz_max
-      - sliding.residual_doppler_error_count
-      - sliding.var_test_alpha
       - sliding.var_whiteness_test_lags
       - sliding.var_diagnostic_whiteness_lags
-      - sliding.var_diagnostic_plot_whiteness_lag
       - sliding.var_forecast_horizons_samples
       - sliding.var_forecast_eval_samples
-      - sliding.diagnostic_max_cases_per_severity
       - sliding.forecast_example_c_n0_db_hz
       - sliding.forecast_example_block_len
       - sliding.forecast_example_latency_samples
       - quality_control
       - tvd
     outs:
-      - results/csv/04_sliding/sliding_var_orders.csv
-      - results/csv/04_sliding/sliding_var_residual_summary.csv
-      - results/csv/04_sliding/sliding_var_forecast_utility.csv
-      - results/csv/04_sliding/sliding_practical_metrics.csv
-      - results/csv/04_sliding/sliding_forecast_example.csv
-      - results/csv/04_sliding/sliding_residual_doppler_metrics.csv
-      - results/csv/04_sliding/sliding_var_residual_diagnostics.csv
+      - outputs/04_sliding/sliding_var_orders.csv
+      - outputs/04_sliding/sliding_var_residual_summary.csv
+      - outputs/04_sliding/sliding_var_forecast_utility.csv
+      - outputs/04_sliding/sliding_practical_metrics.csv
+      - outputs/04_sliding/sliding_forecast_example.csv
 
   sliding_heatmap:
     cmd: uv run python -m real_time_bp.scripts.get_sliding_heatmap
@@ -151,7 +141,7 @@ stages:
       - real_time_bp/utils/quality.py
       - real_time_bp/utils/representatives.py
       - data/raw/backpropagation
-      - results/csv/03_filter_bank/filter_bank_estimates.csv
+      - outputs/03_filter_bank/filter_bank_estimates.csv
     params:
       - dataset
       - runtime
@@ -165,8 +155,8 @@ stages:
       - quality_control
       - tvd
     outs:
-      - results/csv/04_sliding/sliding_latency_heatmap_cases.csv
-      - results/csv/04_sliding/sliding_latency_heatmap.csv
+      - outputs/04_sliding/sliding_latency_heatmap_cases.csv
+      - outputs/04_sliding/sliding_latency_heatmap.csv
 
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
@@ -194,7 +184,7 @@ stages:
       - real_time_bp/utils/quality.py
       - real_time_bp/utils/representatives.py
       - data/raw/backpropagation
-      - results/csv/03_filter_bank/filter_bank_estimates.csv
+      - outputs/03_filter_bank/filter_bank_estimates.csv
     params:
       - dataset
       - runtime
@@ -209,11 +199,11 @@ stages:
       - representatives
       - tvd
     outs:
-      - results/csv/02_cycle_slips/tvd_representative_cases.csv
-      - results/csv/02_cycle_slips/tvd_example_traces.csv
-      - results/csv/03_filter_bank/filter_bank_representative_score_curves.csv
-      - results/csv/03_filter_bank/filter_bank_representative_phase_traces.csv
-      - results/csv/04_sliding/sliding_phase_example.csv
+      - outputs/02_cycle_slips/tvd_representative_cases.csv
+      - outputs/02_cycle_slips/tvd_example_traces.csv
+      - outputs/03_filter_bank/filter_bank_representative_score_curves.csv
+      - outputs/03_filter_bank/filter_bank_representative_phase_traces.csv
+      - outputs/04_sliding/sliding_phase_example.csv
 
   result_plots:
     cmd: uv run python -m real_time_bp.plots.main
@@ -231,15 +221,15 @@ stages:
       - real_time_bp/methodology/filter_bank.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
-      - results/csv/01_dataset
-      - results/csv/02_cycle_slips/tvd_representative_cases.csv
-      - results/csv/02_cycle_slips/tvd_example_traces.csv
-      - results/csv/03_filter_bank
-      - results/csv/04_sliding/sliding_var_orders.csv
-      - results/csv/04_sliding/sliding_practical_metrics.csv
-      - results/csv/04_sliding/sliding_latency_heatmap.csv
-      - results/csv/04_sliding/sliding_phase_example.csv
-      - results/csv/04_sliding/sliding_forecast_example.csv
+      - outputs/01_dataset
+      - outputs/02_cycle_slips/tvd_representative_cases.csv
+      - outputs/02_cycle_slips/tvd_example_traces.csv
+      - outputs/03_filter_bank
+      - outputs/04_sliding/sliding_var_orders.csv
+      - outputs/04_sliding/sliding_practical_metrics.csv
+      - outputs/04_sliding/sliding_latency_heatmap.csv
+      - outputs/04_sliding/sliding_phase_example.csv
+      - outputs/04_sliding/sliding_forecast_example.csv
     params:
       - plots
       - experiments
@@ -248,3 +238,5 @@ stages:
       - tvd
     plots:
       - results/figures
+    outs:
+      - results/csv_tables

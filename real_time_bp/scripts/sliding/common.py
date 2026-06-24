@@ -5,10 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from real_time_bp.config import CSV_RESULTS_DIR
+from real_time_bp.config import OUTPUTS_DIR
 from real_time_bp.methodology.filter_bank import AMPLITUDE_SCORE_NAME
 from real_time_bp.utils.io import iter_case_dataframes
-from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.quality import (
+    evaluate_analysis_quality,
+    exclude_loss_of_lock_enabled,
+)
 from real_time_bp.utils.stage import csv_chunksize_from_params, l1_wavelength_from_params
 
 SLIDING_TRACKING_COLUMNS = {
@@ -41,6 +44,7 @@ def quality_valid_case_ids(
     wavelength_m = l1_wavelength_from_params(params)
     experiments = params.get("experiments", {})
     chunksize = csv_chunksize_from_params(params)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     valid: set[int] = set()
     seen: set[int] = set()
     case_iter = iter_case_dataframes(
@@ -49,6 +53,7 @@ def quality_valid_case_ids(
         max_cases_per_condition=None,
         chunksize=chunksize,
         columns=SLIDING_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     for metadata, case_df in case_iter:
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
@@ -73,7 +78,7 @@ def load_amplitude_tf_estimates() -> dict[int, float]:
     Returns:
         Mapping from tracking case identifier to estimated Fresnel time scale.
     """
-    path = CSV_RESULTS_DIR / "03_filter_bank" / "filter_bank_estimates.csv"
+    path = OUTPUTS_DIR / "03_filter_bank" / "filter_bank_estimates.csv"
     if not path.exists():
         return {}
     df = pd.read_csv(path)
@@ -99,9 +104,27 @@ def valid_eval_indices(n_samples: int, block_len: int) -> np.ndarray:
     Returns:
         Integer indices where the sliding BP window can be evaluated.
     """
+    eval_slice = valid_eval_slice(n_samples, block_len)
+    return np.arange(eval_slice.start, eval_slice.stop, dtype=int)
+
+
+def valid_eval_slice(n_samples: int, block_len: int, start_index: int = 0) -> slice:
+    """Return the contiguous analyzed segment for sliding-window support.
+
+    Args:
+        n_samples: Total number of samples in the case.
+        block_len: Sliding FFT block length.
+        start_index: First sample kept after initialization.
+
+    Returns:
+        Slice spanning samples with full sliding-window support and index at
+        least `start_index`.
+    """
     half = int(block_len) // 2
     future_context = int(block_len) - half - 1
-    return np.arange(half, max(half, int(n_samples) - future_context), dtype=int)
+    start = max(int(start_index), half)
+    stop = max(start, int(n_samples) - future_context)
+    return slice(start, stop)
 
 
 def thin_eval_indices(indices: np.ndarray, max_points: int) -> np.ndarray:
@@ -123,21 +146,3 @@ def thin_eval_indices(indices: np.ndarray, max_points: int) -> np.ndarray:
         return indices
     positions = np.linspace(0, indices.size - 1, int(max_points), dtype=int)
     return indices[positions]
-
-
-def sliding_residual_grid_hz(params: dict) -> pd.DataFrame:
-    """Construct the residual Doppler grid for sliding sensitivity plots.
-
-    Args:
-        params: Parsed `params.yaml` dictionary.
-
-    Returns:
-        DataFrame with one `residual_doppler_error_hz` column.
-    """
-    sliding_cfg = params.get("sliding", {})
-    values = np.linspace(
-        float(sliding_cfg.get("residual_doppler_error_hz_min", 0.0)),
-        float(sliding_cfg.get("residual_doppler_error_hz_max", 1.5)),
-        int(sliding_cfg.get("residual_doppler_error_count", 16)),
-    )
-    return pd.DataFrame({"residual_doppler_error_hz": values})

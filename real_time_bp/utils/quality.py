@@ -32,6 +32,19 @@ class AnalysisQuality:
     span_cycles: float
 
 
+def exclude_loss_of_lock_enabled(params: dict[str, Any]) -> bool:
+    """Read the metadata-level loss-of-lock cleanup flag.
+
+    Args:
+        params: Parsed `params.yaml` dictionary.
+
+    Returns:
+        True when stages should skip cases flagged as loss of lock before
+        running expensive computations.
+    """
+    return bool(params.get("quality_control", {}).get("exclude_loss_of_lock", True))
+
+
 def evaluate_analysis_quality(
     metadata: dict[str, Any],
     case_df: pd.DataFrame,

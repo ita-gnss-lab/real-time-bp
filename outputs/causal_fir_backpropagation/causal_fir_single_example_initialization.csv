@@ -1,2 +1,0 @@
-dataset_handle,dataset_path,X_raw_shape,valid_signals,excluded_loss_of_lock_signals,example_realization_idx,rho_over_v_s,dt_s,Fs_hz,N,M_centered,fir_len,fit_band_hz,fir_variants
-rodrigodlf/backpropagation,/home/rodrigo/.cache/kagglehub/datasets/rodrigodlf/backpropagation/versions/5,"(10000, 15000, 5)",6726,3274,0,1.4130542610142245,0.02,50.0,15000,1024,512,2.0,"passband_only_ridge_1e-6,passband_only_ridge_1e-2,stopband_weight_0p2_ridge_1e-3,stopband_weight_1_ridge_1e-2,stopband_weight_0p2_ridge_1e-3_prebandlimited"

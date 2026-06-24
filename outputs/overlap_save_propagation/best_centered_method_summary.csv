@@ -1,2 +1,0 @@
-selected_by,method,block_len,window,latency_samples,latency_s,field_rel_error,amp_rmse,phase_rmse_rad,amp_corr
-phase_rmse_rad,centered_local_fft,6000,tukey,3000,60.0,0.0064137235795190236,0.004657177911421615,0.00662452515253848,0.9999235185378391

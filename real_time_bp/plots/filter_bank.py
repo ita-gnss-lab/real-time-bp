@@ -13,7 +13,6 @@ from real_time_bp.plots.common import (
     amplitude_only,
     placeholder,
     read_csv,
-    remove_figure,
     save_figure,
 )
 from real_time_bp.utils.params import load_params
@@ -39,9 +38,6 @@ def plot_filter_bank() -> None:
     """
     out_dir = figure_stage_dir("03_filter_bank")
     scores = read_csv("03_filter_bank/filter_bank_representative_score_curves.csv")
-    if scores.empty:
-        scores = read_csv("03_filter_bank/filter_bank_score_curves.csv")
-    estimates = amplitude_only(read_csv("03_filter_bank/filter_bank_estimates.csv"))
     boxplot_estimates = amplitude_only(
         read_csv("03_filter_bank/filter_bank_boxplot_estimates.csv")
     )
@@ -57,15 +53,10 @@ def plot_filter_bank() -> None:
     _plot_score_curves(scores, out_dir / "representative_filter_bank_score_curves.pdf")
     _plot_n_init_sensitivity(
         n_init,
-        boxplot_estimates if not boxplot_estimates.empty else estimates,
+        boxplot_estimates,
         out_dir / "n_init_sensitivity.pdf",
         n_init_boxplot,
     )
-    remove_figure(out_dir / "fresnel_time_error_boxplot.pdf")
-    remove_figure(out_dir / "residual_doppler_sensitivity.pdf")
-    remove_figure(out_dir / "downstream_phase_metrics.pdf")
-    remove_figure(out_dir / "representative_phase_retrieval.pdf")
-    remove_figure(out_dir / "representative_phase_retrieval_legacy.pdf")
 
 
 def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:

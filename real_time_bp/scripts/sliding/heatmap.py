@@ -23,18 +23,25 @@ from real_time_bp.scripts.sliding.common import (
     SLIDING_TRACKING_COLUMNS,
     quality_valid_case_ids,
     valid_eval_indices,
+    valid_eval_slice,
 )
-from real_time_bp.utils.io import count_cases, iter_case_dataframes, load_case_index
+from real_time_bp.utils.io import (
+    count_cases,
+    filter_loss_of_lock_case_index,
+    iter_case_dataframes,
+    load_case_index,
+)
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import fixed_step_values
 from real_time_bp.utils.progress import progress_iter
-from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.quality import (
+    evaluate_analysis_quality,
+    exclude_loss_of_lock_enabled,
+)
 from real_time_bp.utils.representatives import SEVERITY_ORDER
 from real_time_bp.utils.stage import (
     case_keys,
     csv_chunksize_from_params,
-    is_loss_of_lock,
-    optional_int,
     parallel_workers_from_params,
 )
 
@@ -67,11 +74,21 @@ def compute_heatmap(
     latency_fractions = _latency_fractions_from_params(sliding_cfg)
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     selected_case_ids = select_heatmap_case_ids(params, paths, tf_estimates)
     total_cases = len(selected_case_ids)
-    raw_cases = count_cases(paths, severities=experiments.get("severities"))
+    raw_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        exclude_loss_of_lock=False,
+    )
+    metadata_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        exclude_loss_of_lock=exclude_loss_of_lock,
+    )
     heatmap_cells_per_case = _heatmap_cell_count(m_grid, latency_fractions)
-    _log_heatmap_plan(raw_cases, total_cases, m_grid, latency_fractions)
+    _log_heatmap_plan(raw_cases, metadata_cases, total_cases, m_grid, latency_fractions)
     logger.info(
         "Worst-case heatmap grid: {} selected case(s) from {} raw case(s), {} FFT lengths, {} M/L cells per selected case, no time thinning, {} worker(s)",
         total_cases,
@@ -89,6 +106,7 @@ def compute_heatmap(
         max_cases_per_condition=None,
         chunksize=chunksize,
         columns=SLIDING_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     selected_case_iter = iter_selected_diagnostic_cases(case_iter, selected_case_ids)
     task_iter = (
@@ -185,7 +203,7 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
         int(sliding_cfg.get("var_order_min", 1)),
         int(sliding_cfg.get("var_order_max", 24)),
     )
-    logger.info(
+    logger.debug(
         "Heatmap case {} {} M={}: {} latency cell(s), {} sliding-BP evaluation(s)",
         case_id,
         metadata.get("severity"),
@@ -207,17 +225,14 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
             var_result,
         )
         phase = median_align_phase(unwrap_phase(sliding), true_phase, n_init)
-        mask = np.zeros(len(case_df), dtype=bool)
-        mask[eval_indices] = True
-        mask[:n_init] = False
+        eval_slice = valid_eval_slice(len(case_df), int(block_len), n_init)
         slip_count, slips_per_min = tvd_cycle_slips_per_minute(
-            phase - true_phase,
-            intensity_db,
-            time_sec,
+            (phase - true_phase)[eval_slice],
+            intensity_db[eval_slice],
+            time_sec[eval_slice],
             float(tvd_cfg.get("fade_threshold_db", -10.0)),
             float(tvd_cfg.get("allowed_jump_weight", 1.0)),
             float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-            mask=mask,
         )
         rows.append(
             {
@@ -225,7 +240,10 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
                 "block_len": int(block_len),
                 "latency_samples": int(latency),
                 "latency_fraction": float(latency_fraction),
-                "refractive_phase_rmse_rad": phase_rmse_rad(true_phase[mask], phase[mask]),
+                "refractive_phase_rmse_rad": phase_rmse_rad(
+                    true_phase[eval_slice],
+                    phase[eval_slice],
+                ),
                 "cycle_slip_count": slip_count,
                 "cycle_slips_per_minute": slips_per_min,
             }
@@ -235,6 +253,7 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
 
 def _log_heatmap_plan(
     raw_cases: int,
+    metadata_cases: int,
     total_cases: int,
     m_grid: np.ndarray,
     latency_fractions: np.ndarray,
@@ -246,19 +265,19 @@ def _log_heatmap_plan(
         [round(float(value), 3) for value in latency_fractions],
     )
     logger.info(
-        "Heatmap workload: {} selected case(s) from {} raw case(s), {} cell(s)/case",
+        "Heatmap workload: {} selected case(s), {} metadata-valid case(s), {} raw case(s), {} cell(s)/case",
         total_cases,
+        metadata_cases,
         raw_cases,
         _heatmap_cell_count(m_grid, latency_fractions),
     )
-    for block_len in m_grid:
-        future_context = int(block_len) - int(block_len) // 2 - 1
-        latency_count = len(_latency_grid(future_context, latency_fractions))
-        logger.info(
-            "Heatmap M={}: {} latency cell(s); valid samples depend on each case length",
-            int(block_len),
-            latency_count,
+    latency_counts = {
+        int(block_len): len(
+            _latency_grid(int(block_len) - int(block_len) // 2 - 1, latency_fractions)
         )
+        for block_len in m_grid
+    }
+    logger.info("Heatmap latency cell count by M: {}", latency_counts)
 
 
 def _case_heatmap_evaluation_count(
@@ -321,48 +340,6 @@ def select_heatmap_case_ids(
     return selected_ids
 
 
-def select_diagnostic_case_ids(params: dict, paths) -> set[int] | None:
-    """Select representative case ids for lightweight diagnostic stages.
-
-    Main paper:
-        Residual-Doppler and VAR diagnostics are supporting checks, so a small
-        number of representative C/N0 cases are selected per severity.
-
-    Args:
-        params: Parsed `params.yaml` dictionary.
-        paths: Resolved dataset paths.
-
-    Returns:
-        Selected case ids, an empty set when no cases match, or None to use all
-        cases.
-    """
-    sliding_cfg = params.get("sliding", {})
-    max_cases = optional_int(sliding_cfg.get("diagnostic_max_cases_per_severity", 1))
-    if max_cases is None:
-        return None
-
-    experiments = params.get("experiments", {})
-    case_index = _quality_case_index(params, paths, candidate_case_ids=None)
-    if case_index.empty:
-        return set()
-
-    target_c_n0 = float(experiments.get("representative_c_n0_db_hz", 30.0))
-    if "input_c_n0_db_hz" in case_index.columns:
-        case_index["_c_n0_distance"] = (
-            pd.to_numeric(case_index["input_c_n0_db_hz"], errors="coerce") - target_c_n0
-        ).abs()
-    else:
-        case_index["_c_n0_distance"] = 0.0
-    sort_columns = [
-        column
-        for column in ["_severity_order", "severity", "_c_n0_distance", "tracking_case_id"]
-        if column in case_index.columns
-    ]
-    case_index = case_index.sort_values(sort_columns)
-    selected = case_index.groupby("severity", dropna=False, sort=False).head(max_cases)
-    return {int(case_id) for case_id in selected["tracking_case_id"].to_numpy()}
-
-
 def _quality_case_index(
     params: dict,
     paths,
@@ -378,10 +355,10 @@ def _quality_case_index(
         case_index = case_index[
             case_index["tracking_case_id"].astype(int).isin(candidate_case_ids)
         ]
-    if "loss_of_lock" in case_index.columns:
-        case_index = case_index[
-            ~case_index.apply(lambda row: is_loss_of_lock(row.to_dict()), axis=1)
-        ]
+    case_index = filter_loss_of_lock_case_index(
+        case_index,
+        exclude_loss_of_lock=exclude_loss_of_lock_enabled(params),
+    )
     severity_filter = set(experiments.get("severities") or [])
     if severity_filter and "severity" in case_index.columns:
         case_index = case_index[case_index["severity"].astype(str).isin(severity_filter)]

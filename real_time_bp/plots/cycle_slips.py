@@ -9,10 +9,8 @@ import pandas as pd
 from real_time_bp.methodology.tvd import find_fade_minima
 from real_time_bp.plots.common import (
     amplitude_only,
-    column,
     placeholder,
     read_csv,
-    remove_figure,
     save_figure,
 )
 from real_time_bp.utils.params import load_params
@@ -29,7 +27,6 @@ def plot_cycle_slips() -> None:
         cycle-bias trace beside the fade minima that constrain allowed jumps.
     """
     out_dir = figure_stage_dir("02_cycle_slips")
-    filter_dir = figure_stage_dir("03_filter_bank")
     params = load_params()
     threshold_db = float(params.get("tvd", {}).get("fade_threshold_db", -10.0))
     trace = read_csv("02_cycle_slips/tvd_example_traces.csv")
@@ -38,7 +35,6 @@ def plot_cycle_slips() -> None:
     )
     if trace.empty:
         placeholder(out_dir / "tvd_example_traces.pdf", "No TVD example trace data")
-        remove_figure(filter_dir / "representative_phase_retrieval.pdf")
         return
     if "loss_of_lock" in trace.columns:
         no_lock_trace = trace[~bool_series(trace["loss_of_lock"])]
@@ -47,7 +43,6 @@ def plot_cycle_slips() -> None:
     severities = list(SEVERITY_ORDER)
     if not any(str(value) in severities for value in trace["severity"].dropna().unique()):
         placeholder(out_dir / "tvd_example_traces.pdf", "No no-lock TVD example traces")
-        remove_figure(filter_dir / "representative_phase_retrieval.pdf")
         return
     fig, axes = plt.subplots(
         3,
@@ -127,27 +122,11 @@ def plot_cycle_slips() -> None:
         if intensity_ylim is not None:
             intensity_ax.set_ylim(*intensity_ylim)
 
-        estimated_col = (
-            "estimated_diffractive_phase_cycles"
-            if "estimated_diffractive_phase_cycles" in group
-            else "diffractive_phase_cycles"
-        )
+        estimated_col = "estimated_diffractive_phase_cycles"
         if not filter_group.empty:
-            true_scintillation_col = column(
-                filter_group,
-                "true_scintillation_phase_rad",
-                "true_refractive_phase_rad",
-            )
-            estimated_scintillation_col = column(
-                filter_group,
-                "estimated_scintillation_phase_rad",
-                "true_refractive_phase_rad",
-            )
-            batch_col = column(
-                filter_group,
-                "backpropagated_refractive_phase_rad",
-                "backpropagated_phase_rad",
-            )
+            true_scintillation_col = "true_scintillation_phase_rad"
+            estimated_scintillation_col = "estimated_scintillation_phase_rad"
+            batch_col = "backpropagated_refractive_phase_rad"
             phase_ax.plot(
                 filter_group["time_sec"],
                 filter_group[true_scintillation_col],
@@ -206,14 +185,7 @@ def plot_cycle_slips() -> None:
                 label=r"$\phi_s-\phi_r$",
             )
         if not filter_group.empty:
-            batch_error_col = column(
-                filter_group,
-                "batch_refractive_phase_error_cycles",
-                "phase_error_rad",
-            )
-            batch_error = filter_group[batch_error_col]
-            if batch_error_col == "phase_error_rad":
-                batch_error = batch_error / (2.0 * np.pi)
+            batch_error = filter_group["batch_refractive_phase_error_cycles"]
             batch_error = _median_reference_cycles(batch_error)
             error_ax.plot(
                 filter_group["time_sec"],
@@ -240,7 +212,6 @@ def plot_cycle_slips() -> None:
         if handles:
             axes[row, -1].legend(handles, labels, loc="best")
     save_figure(fig, out_dir / "tvd_example_traces.pdf", tight=False)
-    remove_figure(filter_dir / "representative_phase_retrieval.pdf")
 
 
 def _zero_reference_cycles(values) -> np.ndarray:

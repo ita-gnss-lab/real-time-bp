@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 from real_time_bp.config import PROJECT_ROOT
+from real_time_bp.utils.stage import is_loss_of_lock
 
 TRACKING_BASE_REQUIRED_COLUMNS = {
     "tracking_case_id",
@@ -147,6 +148,7 @@ def count_cases(
     paths: DatasetPaths,
     severities: list[str] | None = None,
     max_cases_per_condition: int | None = None,
+    exclude_loss_of_lock: bool = False,
 ) -> int | None:
     """Count cases after applying severity and per-condition limits.
 
@@ -154,6 +156,7 @@ def count_cases(
         paths: Resolved dataset paths.
         severities: Optional severity labels to keep.
         max_cases_per_condition: Optional limit per severity/CN0 condition.
+        exclude_loss_of_lock: Whether to exclude cases flagged as loss of lock.
 
     Returns:
         Case count, or None when no case index is available.
@@ -163,6 +166,10 @@ def count_cases(
         return None
     if "tracking_case_id" in case_index.columns:
         case_index = case_index.drop_duplicates("tracking_case_id")
+    case_index = filter_loss_of_lock_case_index(
+        case_index,
+        exclude_loss_of_lock=exclude_loss_of_lock,
+    )
     severity_filter = set(severities or [])
     if severity_filter and "severity" in case_index.columns:
         case_index = case_index[case_index["severity"].astype(str).isin(severity_filter)]
@@ -187,6 +194,7 @@ def iter_case_dataframes(
     max_cases_per_condition: int | None = None,
     chunksize: int = 250_000,
     columns: set[str] | None = None,
+    exclude_loss_of_lock: bool = False,
 ) -> Iterator[tuple[dict, pd.DataFrame]]:
     """Stream tracking cases as individual DataFrames.
 
@@ -196,6 +204,8 @@ def iter_case_dataframes(
         max_cases_per_condition: Optional limit per severity/CN0 condition.
         chunksize: CSV chunk size used while reading measurement files.
         columns: Optional measurement columns to load in addition to metadata.
+        exclude_loss_of_lock: Whether to skip cases flagged as loss of lock
+            before yielding them to expensive analysis stages.
 
     Yields:
         Pairs of case metadata and a DataFrame containing one complete case.
@@ -221,6 +231,8 @@ def iter_case_dataframes(
                 severity = str(case_df["severity"].iloc[0])
             else:
                 severity = ""
+            if exclude_loss_of_lock and is_loss_of_lock(metadata):
+                continue
             if severity_filter and severity not in severity_filter:
                 continue
             c_n0 = metadata.get("input_c_n0_db_hz", np.nan)
@@ -230,6 +242,29 @@ def iter_case_dataframes(
                     continue
                 yielded_by_condition[condition] = yielded_by_condition.get(condition, 0) + 1
             yield metadata, case_df
+
+
+def filter_loss_of_lock_case_index(
+    case_index: pd.DataFrame,
+    *,
+    exclude_loss_of_lock: bool,
+) -> pd.DataFrame:
+    """Apply the metadata-level loss-of-lock analysis mask.
+
+    Args:
+        case_index: One-row-per-case diagnostics table.
+        exclude_loss_of_lock: Whether to remove cases marked as loss of lock.
+
+    Returns:
+        Filtered case index. The original table is returned unchanged when the
+        flag is disabled or the dataset lacks the `loss_of_lock` column.
+    """
+    if not exclude_loss_of_lock or case_index.empty or "loss_of_lock" not in case_index.columns:
+        return case_index
+    locked = ~case_index["loss_of_lock"].map(
+        lambda value: is_loss_of_lock({"loss_of_lock": value})
+    )
+    return case_index[locked].copy()
 
 
 def _iter_tracking_cases_from_csv(

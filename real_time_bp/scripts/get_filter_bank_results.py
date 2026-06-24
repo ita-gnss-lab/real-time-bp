@@ -37,7 +37,10 @@ from real_time_bp.utils.output_rows import sampled_time_rows
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import fixed_step_values, load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
-from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.quality import (
+    evaluate_analysis_quality,
+    exclude_loss_of_lock_enabled,
+)
 from real_time_bp.utils.representatives import (
     severity_groups,
     sort_by_severity,
@@ -71,7 +74,6 @@ TF_ERROR_METRICS_CSV = "filter_bank_tf_error_metrics.csv"
 DOWNSTREAM_SUMMARY_CSV = "filter_bank_downstream_summary.csv"
 N_INIT_SENSITIVITY_CSV = "filter_bank_n_init_sensitivity.csv"
 BOXPLOT_ESTIMATES_CSV = "filter_bank_boxplot_estimates.csv"
-RESIDUAL_DOPPLER_SENSITIVITY_CSV = "filter_bank_residual_doppler_sensitivity.csv"
 
 
 def main() -> None:
@@ -95,11 +97,31 @@ def main() -> None:
     max_cases = optional_int(experiments.get("max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     logger.info("Using {} parallel worker(s)", workers)
+    raw_total_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+        exclude_loss_of_lock=False,
+    )
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),
         max_cases_per_condition=max_cases,
+        exclude_loss_of_lock=exclude_loss_of_lock,
+    )
+    if raw_total_cases is not None and total_cases is not None:
+        logger.info(
+            "Filter-bank cases: {} after loss-of-lock filtering from {} raw case(s)",
+            total_cases,
+            raw_total_cases,
+        )
+    logger.info(
+        "Filter-bank grid: {} T_F candidate(s), N_init={}, score-curve N_init values={}",
+        len(candidates),
+        int(experiments.get("n_init_samples", 4096)),
+        score_n_init_samples,
     )
 
     score_rows: list[dict] = []
@@ -112,6 +134,7 @@ def main() -> None:
         max_cases_per_condition=max_cases,
         chunksize=chunksize,
         columns=FILTER_BANK_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     task_iter = _iter_filter_bank_tasks(
         case_iter,
@@ -160,9 +183,6 @@ def main() -> None:
         _compute_boxplot_estimates(params, paths, candidates, wavelength_m),
         out_dir / BOXPLOT_ESTIMATES_CSV,
     )
-    stale_residual_csv = out_dir / RESIDUAL_DOPPLER_SENSITIVITY_CSV
-    if stale_residual_csv.exists():
-        stale_residual_csv.unlink()
     logger.info("Finished filter-bank results stage")
 
 
@@ -258,17 +278,17 @@ def _compute_case_filter_bank(
     )
     backpropagated = batch_backpropagate(signal, sample_interval_s, estimated_tf)
     phase = median_align_phase(unwrap_phase(backpropagated), true_phase, n_init)
-    phase_rmse = phase_rmse_rad(true_phase[n_init:], phase[n_init:])
+    eval_slice = slice(n_init, None)
+    phase_rmse = phase_rmse_rad(true_phase[eval_slice], phase[eval_slice])
     intensity_db = detrended_intensity_db(case_df)
     tvd_cfg = params.get("tvd", {})
     slip_count, slips_per_min = tvd_cycle_slips_per_minute(
-        phase - true_phase,
-        intensity_db,
-        case_df["time_sec"].to_numpy(dtype=float),
+        (phase - true_phase)[eval_slice],
+        intensity_db[eval_slice],
+        case_df["time_sec"].to_numpy(dtype=float)[eval_slice],
         float(tvd_cfg.get("fade_threshold_db", -10.0)),
         float(tvd_cfg.get("allowed_jump_weight", 1.0)),
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        start_index=n_init,
     )
     downstream_rows.append(
         {
@@ -309,14 +329,12 @@ def _compute_case_filter_bank(
                     ),
                     "true_refractive_phase_rad": float(true_phase[idx]),
                     "backpropagated_refractive_phase_rad": float(phase[idx]),
-                    "backpropagated_phase_rad": float(phase[idx]),
                     "true_scintillation_minus_refractive_rad": float(
                         true_scintillation_phase[idx] - true_phase[idx]
                     ),
                     "estimated_scintillation_minus_refractive_rad": float(
                         aligned_estimated_scintillation_phase[idx] - true_phase[idx]
                     ),
-                    "phase_error_rad": float(phase[idx] - true_phase[idx]),
                     "batch_refractive_phase_error_rad": float(batch_phase_error[idx]),
                     "batch_refractive_phase_error_cycles": float(
                         batch_phase_error[idx] / (2.0 * np.pi)
@@ -427,57 +445,78 @@ def _compute_n_init_sensitivity(
     max_cases = optional_int(experiments.get("n_init_sweep_max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     n_init_values = fixed_step_values(
         experiments.get("n_init_sweep_samples"),
         default=[int(experiments.get("n_init_samples", 4096))],
         dtype=int,
     )
-    for n_init in n_init_values:
-        logger.info("Computing N_init sensitivity for N_init={}", n_init)
-        estimate_rows: list[dict] = []
-        downstream_rows: list[dict] = []
-        case_iter = iter_case_dataframes(
-            paths,
-            severities=experiments.get("severities"),
-            max_cases_per_condition=max_cases,
-            chunksize=chunksize,
-            columns=FILTER_BANK_TRACKING_COLUMNS,
-        )
-        task_iter = _iter_filter_bank_tasks(
-            case_iter,
-            params,
-            candidates,
-            wavelength_m,
-            residual_doppler_error_hz=0.0,
-            n_init=int(n_init),
-            score_n_init_samples=None,
-        )
-        result_iter = ordered_parallel_map(
-            _compute_case_filter_bank_task,
-            task_iter,
-            workers=workers,
-        )
-        total_cases = count_cases(
-            paths,
-            severities=experiments.get("severities"),
-            max_cases_per_condition=max_cases,
-        )
-        for result in progress_iter(
-            result_iter,
-            desc=f"N_init={n_init} cases",
-            total=total_cases,
-            unit="case",
-        ):
-            if result is None:
-                continue
-            estimate_rows.extend(result["estimate_rows"])
-            downstream_rows.extend(result["downstream_rows"])
-        estimates = pd.DataFrame(estimate_rows)
-        downstream = pd.DataFrame(downstream_rows)
-        if estimates.empty:
+    total_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+        exclude_loss_of_lock=exclude_loss_of_lock,
+    )
+    total_tasks = None if total_cases is None else int(total_cases) * len(n_init_values)
+    logger.info(
+        "N_init sensitivity sweep: {} value(s), {} case(s)/value, {} total task(s)",
+        len(n_init_values),
+        total_cases,
+        total_tasks,
+    )
+    logger.info(
+        "N_init range: {} to {} samples; {} T_F candidate(s); {} worker(s)",
+        int(np.min(n_init_values)),
+        int(np.max(n_init_values)),
+        len(candidates),
+        workers,
+    )
+
+    def iter_sensitivity_tasks():
+        for n_init in n_init_values:
+            case_iter = iter_case_dataframes(
+                paths,
+                severities=experiments.get("severities"),
+                max_cases_per_condition=max_cases,
+                chunksize=chunksize,
+                columns=FILTER_BANK_TRACKING_COLUMNS,
+                exclude_loss_of_lock=exclude_loss_of_lock,
+            )
+            yield from _iter_filter_bank_tasks(
+                case_iter,
+                params,
+                candidates,
+                wavelength_m,
+                residual_doppler_error_hz=0.0,
+                n_init=int(n_init),
+                score_n_init_samples=None,
+            )
+
+    estimate_rows: list[dict] = []
+    downstream_rows: list[dict] = []
+    result_iter = ordered_parallel_map(
+        _compute_case_filter_bank_task,
+        iter_sensitivity_tasks(),
+        workers=workers,
+    )
+    for result in progress_iter(
+        result_iter,
+        desc="N_init sensitivity cases",
+        total=total_tasks,
+        unit="task",
+    ):
+        if result is None:
             continue
-        for severity, group in severity_groups(estimates):
-            downstream_group = downstream[downstream["severity"] == severity]
+        estimate_rows.extend(result["estimate_rows"])
+        downstream_rows.extend(result["downstream_rows"])
+    estimates = pd.DataFrame(estimate_rows)
+    downstream = pd.DataFrame(downstream_rows)
+    if estimates.empty:
+        return pd.DataFrame()
+    for n_init, estimates_for_n in estimates.groupby("n_init_samples", sort=True):
+        downstream_for_n = downstream[downstream["n_init_samples"].eq(n_init)]
+        for severity, group in severity_groups(estimates_for_n):
+            downstream_group = downstream_for_n[downstream_for_n["severity"] == severity]
             rows.append(
                 {
                     "n_init_samples": int(n_init),
@@ -516,12 +555,14 @@ def _compute_boxplot_estimates(
     )
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     case_iter = iter_case_dataframes(
         paths,
         severities=experiments.get("severities"),
         max_cases_per_condition=optional_int(experiments.get("max_cases_per_condition")),
         chunksize=chunksize,
         columns=FILTER_BANK_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     task_iter = _iter_filter_bank_tasks(
         case_iter,
@@ -541,6 +582,7 @@ def _compute_boxplot_estimates(
         paths,
         severities=experiments.get("severities"),
         max_cases_per_condition=optional_int(experiments.get("max_cases_per_condition")),
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     estimate_rows = []
     for result in progress_iter(

@@ -10,6 +10,7 @@ from real_time_bp.plots.sliding import plot_sliding
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import apply_plot_style
 from real_time_bp.utils.progress import configure_logging
+from real_time_bp.utils.stage import csv_table_dir
 
 
 def main() -> None:
@@ -18,6 +19,7 @@ def main() -> None:
     configure_logging()
     logger.info("Starting result plot stage")
     load_params()
+    csv_table_dir()
     plot_cycle_slips()
     plot_filter_bank()
     plot_sliding()

@@ -1,7 +1,0 @@
-label,num_valid_samples,field_rel_error,amp_rmse,phase_rmse_rad
-initial backprop_l5_phase: screen field L1,4096,1.0478616834809817,1.0815273989416243e-16,1.1742566634440974
-initial backprop_l5_phase: screen field L5,4096,0.8231718429533381,1.0926004022360031e-16,0.8771238836643472
-initial backprop_l5_phase: received field L1,4096,1.0447549390236774,0.27986263572453196,1.229465257046768
-initial backprop_l5_phase: received field L5,4096,0.7958804974955304,0.19270748746655025,0.8729387667708557
-initial backprop_l5_phase: phase screen L1,4096,,,1.5837340121759147
-initial backprop_l5_phase: phase screen L5,4096,,,2.12082643411696

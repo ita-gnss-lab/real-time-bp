@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from real_time_bp.config import CSV_RESULTS_DIR
+from real_time_bp.config import OUTPUTS_DIR
 
 SEVERITY_ORDER = ("weak", "strong")
 SEVERITY_COLORS = {
@@ -86,11 +86,11 @@ def sort_by_severity(df: pd.DataFrame, extra_columns: list[str] | None = None) -
     )
 
 
-def load_representative_case_ids(csv_dir: Path = CSV_RESULTS_DIR) -> dict[str, int]:
+def load_representative_case_ids(csv_dir: Path = OUTPUTS_DIR) -> dict[str, int]:
     """Load representative TVD case ids selected by the representative stage.
 
     Args:
-        csv_dir: Root CSV results directory.
+        csv_dir: Root operational CSV output directory.
 
     Returns:
         Mapping from severity label to tracking case id.

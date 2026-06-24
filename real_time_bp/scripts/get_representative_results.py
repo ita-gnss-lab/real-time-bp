@@ -39,7 +39,10 @@ from real_time_bp.scripts.sliding.metrics import compute_practical_case
 from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
-from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.quality import (
+    evaluate_analysis_quality,
+    exclude_loss_of_lock_enabled,
+)
 from real_time_bp.utils.stage import (
     csv_chunksize_from_params,
     csv_stage_dir,
@@ -146,10 +149,12 @@ def select_representative_rows(
     experiments = params.get("experiments", {})
     tvd_cfg = params.get("tvd", {})
     max_cases = optional_int(experiments.get("max_cases_per_condition"))
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     total_cases = count_cases(
         paths,
         severities=experiments.get("severities"),
         max_cases_per_condition=max_cases,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     case_iter = iter_case_dataframes(
         paths,
@@ -157,6 +162,7 @@ def select_representative_rows(
         max_cases_per_condition=max_cases,
         chunksize=chunksize,
         columns=TVD_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]] = {}
     for metadata, case_df in progress_iter(
@@ -203,6 +209,7 @@ def compute_tvd_trace_rows(
         return []
     experiments = params.get("experiments", {})
     tvd_cfg = params.get("tvd", {})
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     rows: list[dict] = []
     case_iter = iter_case_dataframes(
         paths,
@@ -210,6 +217,7 @@ def compute_tvd_trace_rows(
         max_cases_per_condition=None,
         chunksize=chunksize,
         columns=TVD_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     for metadata, case_df in progress_iter(
         iter_selected_cases(case_iter, selected_case_ids),
@@ -247,6 +255,7 @@ def compute_filter_bank_representative_rows(
     experiments = params.get("experiments", {})
     candidates = tf_candidate_grid(params)
     score_n_init_samples = _score_curve_n_init_samples(experiments)
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     score_rows: list[dict] = []
     trace_rows: list[dict] = []
     case_iter = iter_case_dataframes(
@@ -255,6 +264,7 @@ def compute_filter_bank_representative_rows(
         max_cases_per_condition=None,
         chunksize=chunksize,
         columns=FILTER_BANK_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     for metadata, case_df in progress_iter(
         iter_selected_cases(case_iter, selected_case_ids),
@@ -293,6 +303,7 @@ def compute_sliding_phase_rows(
         return []
     experiments = params.get("experiments", {})
     tf_estimates = load_amplitude_tf_estimates()
+    exclude_loss_of_lock = exclude_loss_of_lock_enabled(params)
     rows: list[dict] = []
     case_iter = iter_case_dataframes(
         paths,
@@ -300,6 +311,7 @@ def compute_sliding_phase_rows(
         max_cases_per_condition=None,
         chunksize=chunksize,
         columns=SLIDING_TRACKING_COLUMNS,
+        exclude_loss_of_lock=exclude_loss_of_lock,
     )
     for metadata, case_df in progress_iter(
         iter_selected_cases(case_iter, selected_case_ids),

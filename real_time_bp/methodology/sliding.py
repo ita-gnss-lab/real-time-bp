@@ -47,55 +47,6 @@ def select_var_order_bic(
     return best_order, best_result
 
 
-def var_residual_test_summary(
-    var_result: object,
-    alpha: float = 0.05,
-    whiteness_lags: int = 24,
-) -> dict[str, float | bool]:
-    """Run VAR residual normality and whiteness tests.
-
-    Main paper:
-        Results Section III.3 uses these tests as diagnostics for the VAR model
-        fit used by the forecasted sliding BP implementation. The
-        default alpha=0.05 corresponds to a 95% confidence level.
-
-    Args:
-        var_result: Fitted statsmodels VAR result.
-        alpha: Test significance level.
-        whiteness_lags: Number of lags used by the residual whiteness test.
-
-    Returns:
-        Dictionary with test p-values, pass flags, alpha, and the lag count
-        used by the whiteness test.
-    """
-    alpha = float(alpha)
-    whiteness_lags = max(int(whiteness_lags), int(getattr(var_result, "k_ar", 1)) + 1)
-    normality_pvalue = _test_pvalue(lambda: var_result.test_normality(signif=alpha))
-    whiteness_pvalue = _test_pvalue(
-        lambda: var_result.test_whiteness(nlags=whiteness_lags, signif=alpha)
-    )
-    return {
-        "var_test_alpha": alpha,
-        "var_whiteness_test_lags": whiteness_lags,
-        "var_normality_pvalue": normality_pvalue,
-        "var_normality_pass": bool(normality_pvalue > alpha)
-        if np.isfinite(normality_pvalue)
-        else np.nan,
-        "var_whiteness_pvalue": whiteness_pvalue,
-        "var_whiteness_pass": bool(whiteness_pvalue > alpha)
-        if np.isfinite(whiteness_pvalue)
-        else np.nan,
-    }
-
-
-def _test_pvalue(run_test) -> float:
-    try:
-        result = run_test()
-    except Exception:
-        return float("nan")
-    return float(getattr(result, "pvalue", np.nan))
-
-
 def forecast_complex_tail(var_result: object, history: np.ndarray, steps: int) -> np.ndarray:
     """Forecast unavailable future complex scintillation samples.
 

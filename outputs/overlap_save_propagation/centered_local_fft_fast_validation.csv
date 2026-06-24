@@ -1,4 +1,0 @@
-block_len,window,num_checked_samples,max_abs_difference
-128,rectangular,384,8.95090418262362e-16
-128,hann,384,7.021666937153402e-16
-128,causal_nonnegative_lag_filter,64,0.0

@@ -31,6 +31,15 @@ def main() -> None:
     paths = find_dataset_paths(params)
     logger.info("Using dataset root {}", paths.root)
     case_index = load_case_index(paths)
+    severity_filter = set(params.get("experiments", {}).get("severities") or [])
+    if severity_filter and "severity" in case_index.columns:
+        raw_cases = int(case_index.shape[0])
+        case_index = case_index[case_index["severity"].astype(str).isin(severity_filter)].copy()
+        logger.info(
+            "Dataset summary cases: {} after severity filtering from {} raw case(s)",
+            case_index.shape[0],
+            raw_cases,
+        )
 
     if "input_c_n0_db_hz" not in case_index.columns:
         case_index["input_c_n0_db_hz"] = pd.NA
@@ -65,9 +74,6 @@ def main() -> None:
     write_csv(case_index, out_dir / "case_index.csv")
     write_csv(summary, out_dir / "dataset_summary.csv")
     write_csv(tf_candidates, out_dir / "fresnel_time_candidate_grid.csv")
-    stale_residual_grid = out_dir / "residual_doppler_grid.csv"
-    if stale_residual_grid.exists():
-        stale_residual_grid.unlink()
     logger.info("Finished dataset summary stage")
 
 

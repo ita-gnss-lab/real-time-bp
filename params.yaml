@@ -78,16 +78,11 @@ sliding:
   # point used for the batch vs sliding comparison.
   practical_fft_m: 1024
   practical_latency_samples: 511
-  residual_doppler_error_hz_min: 0.0
-  residual_doppler_error_hz_max: 1.5
-  residual_doppler_error_count: 16
-  var_test_alpha: 0.05
   var_whiteness_test_lags: 24
   var_diagnostic_whiteness_lags:
     - 6
     - 12
     - 24
-  var_diagnostic_plot_whiteness_lag: 24
   var_forecast_horizons_samples:
     - 1
     - 4
@@ -95,7 +90,6 @@ sliding:
     - 64
     - 256
   var_forecast_eval_samples: 32
-  diagnostic_max_cases_per_severity: 1
   forecast_example_c_n0_db_hz: 35.0
   forecast_example_block_len: 8192
   forecast_example_latency_samples:
@@ -107,7 +101,8 @@ sliding:
       latency_samples: 512
 
 plots:
-  csv_dir: results/csv
+  csv_dir: outputs
+  csv_tables_dir: results/csv_tables
   figures_dir: results/figures
   forecast_zoom_start_s: 310.0
   forecast_zoom_end_s: 370.0

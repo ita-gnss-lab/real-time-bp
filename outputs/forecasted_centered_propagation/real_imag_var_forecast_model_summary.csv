@@ -1,2 +1,0 @@
-name,block_len,window,forecast_half_window_samples,forecast_future_context_samples,forecast_eval_start,forecast_eval_stop,forecast_eval_len,var_train_stop,var_k_ar,var_aic,var_bic,latencies_samples
-real_imag_var,1024,rectangular,512,511,4000,7000,3000,3500,4,-19.610159104715564,-19.57844607689464,"0,32,64"
