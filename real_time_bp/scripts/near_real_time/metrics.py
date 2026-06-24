@@ -339,6 +339,15 @@ def compute_practical_case(
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
         mask=eval_mask,
     )
+    batch_mrmse_phi_r = phase_rmse_rad(true_phase[eval_mask], batch_phase[eval_mask])
+    near_real_time_mrmse_phi_r = phase_rmse_rad(
+        true_phase[eval_mask],
+        sliding_phase[eval_mask],
+    )
+    tracked_mrmse_phi_s = phase_rmse_rad(
+        true_phase[eval_mask],
+        aligned_estimated_scintillation_phase[eval_mask],
+    )
     practical_row = {
         **case_keys(metadata),
         "estimated_fresnel_time_scale_s": estimated_tf,
@@ -347,16 +356,16 @@ def compute_practical_case(
         "var_order_bic": var_order,
         "block_len": block_len,
         "latency_samples": latency,
-        "batch_refractive_phase_rmse_rad": phase_rmse_rad(
-            true_phase[eval_mask], batch_phase[eval_mask]
-        ),
-        "near_real_time_refractive_phase_rmse_rad": phase_rmse_rad(
-            true_phase[eval_mask],
-            sliding_phase[eval_mask],
-        ),
+        "batch_mrmse_phi_r_rad": batch_mrmse_phi_r,
+        "near_real_time_mrmse_phi_r_rad": near_real_time_mrmse_phi_r,
+        "tracked_mrmse_phi_s_rad": tracked_mrmse_phi_s,
+        "batch_refractive_phase_rmse_rad": batch_mrmse_phi_r,
+        "near_real_time_refractive_phase_rmse_rad": near_real_time_mrmse_phi_r,
         "batch_cycle_slip_count": batch_slips,
+        "batch_cs_per_min": batch_slips_per_min,
         "batch_cycle_slips_per_minute": batch_slips_per_min,
         "near_real_time_cycle_slip_count": sliding_slips,
+        "near_real_time_cs_per_min": sliding_slips_per_min,
         "near_real_time_cycle_slips_per_minute": sliding_slips_per_min,
     }
     var_order_row = {

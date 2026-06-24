@@ -35,13 +35,15 @@ def plot_near_real_time() -> None:
     out_dir = figure_stage_dir("04_near_real_time")
     var_orders = read_csv("04_near_real_time/near_real_time_var_orders.csv")
     practical = read_csv("04_near_real_time/near_real_time_practical_metrics.csv")
-    residual = read_csv("04_near_real_time/near_real_time_residual_doppler_metrics.csv")
+    tvd_summary = read_csv("02_cycle_slips/tvd_cycle_slip_summary.csv")
     heatmap = read_csv("04_near_real_time/near_real_time_latency_heatmap.csv")
     phase = read_csv("04_near_real_time/near_real_time_phase_example.csv")
     forecast = read_csv("04_near_real_time/near_real_time_forecast_example.csv")
 
     _plot_var_orders(var_orders, out_dir / "var_order_histogram.pdf")
-    _plot_practical_metrics(practical, residual, out_dir / "batch_vs_near_real_time_metrics.pdf")
+    _plot_practical_metrics(
+        practical, tvd_summary, out_dir / "batch_vs_near_real_time_metrics.pdf"
+    )
     _plot_latency_heatmap(heatmap, out_dir / "latency_heatmap.pdf")
     _plot_phase_example(phase, out_dir / "near_real_time_phase_example.pdf")
     _plot_forecast_example(forecast, out_dir / "var_forecast_example.pdf")
@@ -78,20 +80,41 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
     save_figure(fig, path)
 
 
-def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: Path) -> None:
+def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) -> None:
     """Plot batch BP versus near-real-time BP practical metrics.
 
     Main paper:
         Results Figure 12 compares the noncausal batch BP reference with the
-        practical near-real-time BP operating point.
+        practical near-real-time BP operating point. The first panel reports
+        MRMSE_phi_r after BP and the tracked MRMSE_phi_s baseline before BP.
+        The second panel reports TVD-derived cycle-slip rates.
     """
     if df.empty:
         placeholder(path, "No practical near-real-time metric data")
         return
     fig, axes = plt.subplots(1, 2, figsize=figure_size("two_panel"), sharex=False)
-    batch_col = column(df, "batch_refractive_phase_rmse_rad", "batch_phase_rmse_rad")
-    near_col = column(
-        df, "near_real_time_refractive_phase_rmse_rad", "near_real_time_phase_rmse_rad"
+    batch_col = _first_column(
+        df,
+        "batch_mrmse_phi_r_rad",
+        "batch_refractive_phase_rmse_rad",
+        "batch_phase_rmse_rad",
+    )
+    near_col = _first_column(
+        df,
+        "near_real_time_mrmse_phi_r_rad",
+        "near_real_time_refractive_phase_rmse_rad",
+        "near_real_time_phase_rmse_rad",
+    )
+    tracked_col = _optional_column(df, "tracked_mrmse_phi_s_rad")
+    batch_cs_col = _first_column(
+        df,
+        "batch_cs_per_min",
+        "batch_cycle_slips_per_minute",
+    )
+    near_cs_col = _first_column(
+        df,
+        "near_real_time_cs_per_min",
+        "near_real_time_cycle_slips_per_minute",
     )
     n_value = (
         int(df["n_init_samples"].dropna().iloc[0])
@@ -103,68 +126,73 @@ def _plot_practical_metrics(df: pd.DataFrame, residual_df: pd.DataFrame, path: P
         if "block_len" in df and df["block_len"].notna().any()
         else None
     )
+    l_value = (
+        int(df["latency_samples"].dropna().iloc[0])
+        if "latency_samples" in df and df["latency_samples"].notna().any()
+        else None
+    )
     for severity, group in severity_groups(df):
-        clean = (
-            group.groupby("input_c_n0_db_hz", as_index=False)[[batch_col, near_col]]
-            .median()
-            .sort_values("input_c_n0_db_hz")
-        )
+        metric_cols = [batch_col, near_col, batch_cs_col, near_cs_col]
+        if tracked_col is not None:
+            metric_cols.append(tracked_col)
+        clean = _mean_by_c_n0(group, metric_cols)
         color = SEVERITY_COLORS.get(str(severity), COLORS["sliding"])
+        if tracked_col is not None:
+            axes[0].plot(
+                clean["input_c_n0_db_hz"],
+                clean[tracked_col],
+                color=color,
+                linestyle=":",
+                linewidth=1.2,
+                label=rf"{severity} $\mathrm{{MRMSE}}_{{\phi_s}}$",
+            )
         axes[0].plot(
             clean["input_c_n0_db_hz"],
             clean[batch_col],
             color=color,
             linestyle="--",
             alpha=0.75,
-            label=rf"{severity} batch BP",
+            label=rf"{severity} batch $\mathrm{{MRMSE}}_{{\phi_r}}$",
         )
         axes[0].plot(
             clean["input_c_n0_db_hz"],
             clean[near_col],
             color=color,
+            label=rf"{severity} sliding $\mathrm{{MRMSE}}_{{\phi_r}}$",
+        )
+        axes[1].plot(
+            clean["input_c_n0_db_hz"],
+            clean[batch_cs_col],
+            color=color,
+            linestyle="--",
+            alpha=0.75,
+            label=rf"{severity} batch BP",
+        )
+        axes[1].plot(
+            clean["input_c_n0_db_hz"],
+            clean[near_cs_col],
+            color=color,
             label=rf"{severity} sliding BP",
         )
-    if not residual_df.empty:
-        residual_batch_col = column(
-            residual_df, "batch_refractive_phase_rmse_rad", "batch_phase_rmse_rad"
-        )
-        residual_near_col = column(
-            residual_df,
-            "near_real_time_refractive_phase_rmse_rad",
-            "near_real_time_phase_rmse_rad",
-        )
-        for severity, group in severity_groups(residual_df):
-            clean = (
-                group.groupby("residual_doppler_error_hz", as_index=False)[
-                    [residual_batch_col, residual_near_col]
-                ]
-                .median()
-                .sort_values("residual_doppler_error_hz")
-            )
-            color = SEVERITY_COLORS.get(str(severity), COLORS["sliding"])
+    if not tvd_df.empty and "cycle_slips_per_minute" in tvd_df.columns:
+        for severity, group in severity_groups(tvd_df):
+            clean = _mean_by_c_n0(group, ["cycle_slips_per_minute"])
+            color = SEVERITY_COLORS.get(str(severity), COLORS["tvd"])
             axes[1].plot(
-                clean["residual_doppler_error_hz"],
-                clean[residual_batch_col],
+                clean["input_c_n0_db_hz"],
+                clean["cycle_slips_per_minute"],
                 color=color,
-                linestyle="--",
-                alpha=0.75,
-                label=rf"{severity} batch BP",
+                linestyle=":",
+                linewidth=1.2,
+                label=rf"{severity} TVD $\hat{{\phi}}_s-\phi_r$",
             )
-            axes[1].plot(
-                clean["residual_doppler_error_hz"],
-                clean[residual_near_col],
-                color=color,
-                label=rf"{severity} sliding BP",
-            )
-    else:
-        axes[1].text(0.5, 0.5, "Regenerate near-real-time CSVs", ha="center", va="center")
     axes[0].set_xlabel(r"$C/N_0$ [dB-Hz]")
-    axes[1].set_xlabel(r"Residual Doppler error [Hz]")
-    axes[1].set_xlim(0.0, 1.5)
+    axes[0].set_ylabel(r"MRMSE [rad]")
+    axes[1].set_xlabel(r"$C/N_0$ [dB-Hz]")
+    axes[1].set_ylabel("CS/min")
     for ax in axes:
-        ax.set_ylabel(r"MRMSE $\hat{\phi}_r$ [rad]")
-        if n_value is not None and m_value is not None:
-            ax.set_title(rf"$N_{{\mathrm{{init}}}}={n_value}$, $M={m_value}$")
+        if n_value is not None and m_value is not None and l_value is not None:
+            ax.set_title(rf"$N_{{\mathrm{{init}}}}={n_value}$, $M={m_value}$, $L={l_value}$")
     axes[0].legend()
     axes[1].legend()
     save_figure(fig, path)
@@ -202,12 +230,10 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
     cs_image = None
     for col, severity in enumerate(severities):
         severity_df = df[df["severity"].astype(str).eq(severity)]
-        metric_group = severity_df.groupby(["block_len", x_col], as_index=False)[
-            metric_col
-        ].median()
+        metric_group = severity_df.groupby(["block_len", x_col], as_index=False)[metric_col].mean()
         cs_group = severity_df.groupby(["block_len", x_col], as_index=False)[
             "cycle_slips_per_minute"
-        ].median()
+        ].mean()
         metric_pivot = metric_group.pivot(index="block_len", columns=x_col, values=metric_col)
         cs_pivot = cs_group.pivot(
             index="block_len", columns=x_col, values="cycle_slips_per_minute"
@@ -577,6 +603,33 @@ def _forecast_start(group: pd.DataFrame) -> float | None:
         if not starts.empty:
             return float(starts.iloc[0])
     return None
+
+
+def _first_column(df: pd.DataFrame, *names: str) -> str:
+    for name in names:
+        if name in df.columns:
+            return name
+    return names[-1]
+
+
+def _optional_column(df: pd.DataFrame, *names: str) -> str | None:
+    for name in names:
+        if name in df.columns:
+            return name
+    return None
+
+
+def _mean_by_c_n0(df: pd.DataFrame, value_columns: list[str]) -> pd.DataFrame:
+    clean = df.copy()
+    clean["input_c_n0_db_hz"] = pd.to_numeric(clean["input_c_n0_db_hz"], errors="coerce")
+    for value_column in value_columns:
+        clean[value_column] = pd.to_numeric(clean[value_column], errors="coerce")
+    return (
+        clean.dropna(subset=["input_c_n0_db_hz"])
+        .groupby("input_c_n0_db_hz", as_index=False)[value_columns]
+        .mean()
+        .sort_values("input_c_n0_db_hz")
+    )
 
 
 def _unique_legend_items(axes) -> tuple[list, list[str]]:

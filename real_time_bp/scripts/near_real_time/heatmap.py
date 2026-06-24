@@ -134,10 +134,10 @@ def aggregate_heatmap_cases(case_rows: pd.DataFrame) -> pd.DataFrame:
     return (
         case_rows.groupby(group_cols, dropna=False)
         .agg(
-            refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "median"),
+            refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "mean"),
             mean_refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "mean"),
             median_refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "median"),
-            cycle_slips_per_minute=("cycle_slips_per_minute", "median"),
+            cycle_slips_per_minute=("cycle_slips_per_minute", "mean"),
             mean_cycle_slips_per_minute=("cycle_slips_per_minute", "mean"),
             median_cycle_slips_per_minute=("cycle_slips_per_minute", "median"),
             n_cases=("tracking_case_id", "nunique"),
