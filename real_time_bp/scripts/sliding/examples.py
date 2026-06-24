@@ -1,14 +1,14 @@
-"""Representative near-real-time phase and VAR forecast output rows."""
+"""Representative sliding phase and VAR forecast output rows."""
 
 from __future__ import annotations
 
 import numpy as np
 
 from real_time_bp.methodology.backpropagation import median_align_phase, unwrap_phase
-from real_time_bp.methodology.near_real_time import sliding_window_bp_with_var_forecast
 from real_time_bp.methodology.signal_model import detrended_intensity_db
+from real_time_bp.methodology.sliding import sliding_window_bp_with_var_forecast
 from real_time_bp.methodology.tvd import tvd_integer_bias
-from real_time_bp.scripts.near_real_time.common import valid_eval_indices
+from real_time_bp.scripts.sliding.common import valid_eval_indices
 from real_time_bp.utils.output_rows import sample_indices, sampled_time_rows
 from real_time_bp.utils.stage import case_keys
 
@@ -26,7 +26,7 @@ def phase_example_rows(
     true_phase: np.ndarray,
     batch_phase: np.ndarray,
 ) -> list[dict]:
-    """Build rows for the near-real-time phase example figure.
+    """Build rows for the sliding phase example figure.
 
     Args:
         metadata: Metadata for the selected tracking case.
@@ -46,9 +46,9 @@ def phase_example_rows(
         List of CSV rows containing sampled phase traces and TVD cycle-bias
         fits for each configured M/L pair.
     """
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     tvd_cfg = params.get("tvd", {})
-    configs = _example_ml_configs(near_cfg)
+    configs = _example_ml_configs(sliding_cfg)
     plot_indices = np.fromiter(sample_indices(len(case_df)), dtype=int)
     n_init = int(params.get("experiments", {}).get("n_init_samples", 4096))
     intensity_db = detrended_intensity_db(case_df)
@@ -105,7 +105,7 @@ def phase_example_rows(
                     "estimated_scintillation_phase_rad": float(estimated_scintillation_phase[idx]),
                     "true_refractive_phase_rad": float(true_phase[idx]),
                     "batch_refractive_phase_rad": float(batch_phase[idx]),
-                    "near_real_time_refractive_phase_rad": float(phase[idx]),
+                    "sliding_refractive_phase_rad": float(phase[idx]),
                     "true_scintillation_minus_refractive_rad": float(
                         true_scintillation_phase[idx] - true_phase[idx]
                     ),
@@ -114,10 +114,8 @@ def phase_example_rows(
                     ),
                     "batch_refractive_phase_error_rad": float(batch_phase[idx] - true_phase[idx]),
                     "batch_integer_cycle_bias": int(batch_integer_cycle_bias[idx]),
-                    "near_real_time_refractive_phase_error_rad": float(
-                        phase[idx] - true_phase[idx]
-                    ),
-                    "near_real_time_integer_cycle_bias": _optional_float(integer_cycle_bias[idx]),
+                    "sliding_refractive_phase_error_rad": float(phase[idx] - true_phase[idx]),
+                    "sliding_integer_cycle_bias": _optional_float(integer_cycle_bias[idx]),
                 },
             )
         )
@@ -243,14 +241,14 @@ def _forecast_example_latencies(future_context: int, latencies: list[int]) -> np
     return np.unique(requested[requested <= max_forecast_latency])
 
 
-def _example_ml_configs(near_cfg: dict) -> list[tuple[int, int]]:
+def _example_ml_configs(sliding_cfg: dict) -> list[tuple[int, int]]:
     configs = []
-    for item in near_cfg.get("example_ml_configs", []) or []:
+    for item in sliding_cfg.get("example_ml_configs", []) or []:
         block_len = int(item.get("block_len"))
         latency = int(item.get("latency_samples"))
         configs.append((block_len, latency))
     if configs:
         return configs
-    block_len = int(near_cfg.get("practical_fft_m", 8192))
-    latency = int(near_cfg.get("practical_latency_samples", block_len // 2 - 1))
+    block_len = int(sliding_cfg.get("practical_fft_m", 8192))
+    latency = int(sliding_cfg.get("practical_latency_samples", block_len // 2 - 1))
     return [(block_len, latency)]

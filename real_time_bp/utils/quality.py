@@ -103,12 +103,12 @@ def diffractive_phase_quality_metrics(
     true_refractive = true_refractive_phase_rad(case_df, float(wavelength_m))
     diffractive_phase_cycles = (estimated_phase - true_refractive) / (2.0 * np.pi)
     return (
-        linear_slope_cycles_per_s(time_sec, diffractive_phase_cycles),
+        lisliding_slope_cycles_per_s(time_sec, diffractive_phase_cycles),
         phase_span_cycles(diffractive_phase_cycles),
     )
 
 
-def linear_slope_cycles_per_s(time_sec: np.ndarray, phase_cycles: np.ndarray) -> float:
+def lisliding_slope_cycles_per_s(time_sec: np.ndarray, phase_cycles: np.ndarray) -> float:
     """Fit the first-order phase slope in cycles/s.
 
     Args:

@@ -1,11 +1,11 @@
-"""Generate the full-dataset near-real-time latency heatmap CSV outputs."""
+"""Generate the full-dataset sliding latency heatmap CSV outputs."""
 
 from __future__ import annotations
 
 from loguru import logger
 
-from real_time_bp.scripts.near_real_time.common import load_amplitude_tf_estimates
-from real_time_bp.scripts.near_real_time.heatmap import aggregate_heatmap_cases, compute_heatmap
+from real_time_bp.scripts.sliding.common import load_amplitude_tf_estimates
+from real_time_bp.scripts.sliding.heatmap import aggregate_heatmap_cases, compute_heatmap
 from real_time_bp.utils.io import find_dataset_paths
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging
@@ -16,15 +16,15 @@ from real_time_bp.utils.stage import (
     write_sorted_csv,
 )
 
-STAGE_DIR = "04_near_real_time"
-LATENCY_HEATMAP_CASES_CSV = "near_real_time_latency_heatmap_cases.csv"
-LATENCY_HEATMAP_CSV = "near_real_time_latency_heatmap.csv"
+STAGE_DIR = "04_sliding"
+LATENCY_HEATMAP_CASES_CSV = "sliding_latency_heatmap_cases.csv"
+LATENCY_HEATMAP_CSV = "sliding_latency_heatmap.csv"
 
 
 def main() -> None:
     """Run the expensive full-dataset M/L heatmap stage."""
     configure_logging()
-    logger.info("Starting full-dataset near-real-time heatmap stage")
+    logger.info("Starting full-dataset sliding heatmap stage")
     params = load_params()
     paths = find_dataset_paths(params)
     wavelength_m = l1_wavelength_from_params(params)
@@ -43,7 +43,7 @@ def main() -> None:
         out_dir / LATENCY_HEATMAP_CSV,
         ["block_len", "latency_samples"],
     )
-    logger.info("Finished full-dataset near-real-time heatmap stage")
+    logger.info("Finished full-dataset sliding heatmap stage")
 
 
 if __name__ == "__main__":

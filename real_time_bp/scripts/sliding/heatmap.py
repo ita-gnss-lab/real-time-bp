@@ -1,4 +1,4 @@
-"""Latency and block-length heatmap generation for near-real-time BP."""
+"""Latency and block-length heatmap generation for sliding BP."""
 
 from __future__ import annotations
 
@@ -8,19 +8,19 @@ import pandas as pd
 
 from real_time_bp.methodology.backpropagation import median_align_phase, unwrap_phase
 from real_time_bp.methodology.metrics import phase_rmse_rad
-from real_time_bp.methodology.near_real_time import (
-    select_var_order_bic,
-    sliding_window_bp_with_var_forecast,
-)
 from real_time_bp.methodology.signal_model import (
     detrended_intensity_db,
     estimate_sample_interval_s,
     estimated_scintillation_signal,
     true_refractive_phase_rad,
 )
+from real_time_bp.methodology.sliding import (
+    select_var_order_bic,
+    sliding_window_bp_with_var_forecast,
+)
 from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute
-from real_time_bp.scripts.near_real_time.common import (
-    NEAR_REAL_TIME_TRACKING_COLUMNS,
+from real_time_bp.scripts.sliding.common import (
+    SLIDING_TRACKING_COLUMNS,
     quality_valid_case_ids,
     valid_eval_indices,
 )
@@ -42,7 +42,7 @@ from real_time_bp.utils.stage import (
 def compute_heatmap(
     params: dict, paths, wavelength_m: float, tf_estimates: dict[int, float]
 ) -> pd.DataFrame:
-    """Compute full-time worst-case near-real-time M/L heatmap rows.
+    """Compute full-time worst-case sliding M/L heatmap rows.
 
     Main paper:
         Results Figure 11 evaluates FFT length M and latency L over the lowest
@@ -61,10 +61,10 @@ def compute_heatmap(
         cell.
     """
     experiments = params.get("experiments", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     rows: list[dict] = []
-    m_grid = _m_grid_from_params(near_cfg)
-    latency_fractions = _latency_fractions_from_params(near_cfg)
+    m_grid = _m_grid_from_params(sliding_cfg)
+    latency_fractions = _latency_fractions_from_params(sliding_cfg)
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
     selected_case_ids = select_heatmap_case_ids(params, paths, tf_estimates)
@@ -88,7 +88,7 @@ def compute_heatmap(
         severities=experiments.get("severities"),
         max_cases_per_condition=None,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     selected_case_iter = iter_selected_diagnostic_cases(case_iter, selected_case_ids)
     task_iter = (
@@ -164,7 +164,7 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
         latency_fractions,
     ) = task
     experiments = params.get("experiments", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     tvd_cfg = params.get("tvd", {})
     case_id = int(metadata.get("tracking_case_id", 0) or 0)
     estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
@@ -182,8 +182,8 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
     features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])
     _, var_result = select_var_order_bic(
         features,
-        int(near_cfg.get("var_order_min", 1)),
-        int(near_cfg.get("var_order_max", 24)),
+        int(sliding_cfg.get("var_order_min", 1)),
+        int(sliding_cfg.get("var_order_max", 24)),
     )
     logger.info(
         "Heatmap case {} {} M={}: {} latency cell(s), {} sliding-BP evaluation(s)",
@@ -304,8 +304,8 @@ def select_heatmap_case_ids(
     Returns:
         Selected tracking case ids.
     """
-    near_cfg = params.get("near_real_time", {})
-    max_cases = max(int(near_cfg.get("heatmap_cases_per_severity", 1)), 1)
+    sliding_cfg = params.get("sliding", {})
+    max_cases = max(int(sliding_cfg.get("heatmap_cases_per_severity", 1)), 1)
     case_index = _quality_case_index(params, paths, set(tf_estimates))
     if case_index.empty:
         return set()
@@ -336,8 +336,8 @@ def select_diagnostic_case_ids(params: dict, paths) -> set[int] | None:
         Selected case ids, an empty set when no cases match, or None to use all
         cases.
     """
-    near_cfg = params.get("near_real_time", {})
-    max_cases = optional_int(near_cfg.get("diagnostic_max_cases_per_severity", 1))
+    sliding_cfg = params.get("sliding", {})
+    max_cases = optional_int(sliding_cfg.get("diagnostic_max_cases_per_severity", 1))
     if max_cases is None:
         return None
 
@@ -442,17 +442,17 @@ def _heatmap_cell_count(m_grid: np.ndarray, latency_fractions: np.ndarray) -> in
     return total
 
 
-def _m_grid_from_params(near_cfg: dict) -> np.ndarray:
+def _m_grid_from_params(sliding_cfg: dict) -> np.ndarray:
     return fixed_step_values(
-        near_cfg.get("fft_m_values"),
+        sliding_cfg.get("fft_m_values"),
         default=[512, 1024, 1536, 2048],
         dtype=int,
     )
 
 
-def _latency_fractions_from_params(near_cfg: dict) -> np.ndarray:
+def _latency_fractions_from_params(sliding_cfg: dict) -> np.ndarray:
     return fixed_step_values(
-        near_cfg.get("heatmap_latency_fractions"),
+        sliding_cfg.get("heatmap_latency_fractions"),
         default=[0.0, 0.25, 0.5, 0.75, 1.0],
         dtype=float,
     )

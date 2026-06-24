@@ -1,24 +1,24 @@
-"""Near-real-time residual Doppler and VAR diagnostic CSV generation."""
+"""Sliding residual Doppler and VAR diagnostic CSV generation."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from real_time_bp.methodology.near_real_time import (
+from real_time_bp.methodology.signal_model import estimated_scintillation_signal
+from real_time_bp.methodology.sliding import (
     select_var_order_bic,
     var_residual_test_summary,
 )
-from real_time_bp.methodology.signal_model import estimated_scintillation_signal
-from real_time_bp.scripts.near_real_time.common import (
-    NEAR_REAL_TIME_TRACKING_COLUMNS,
-    near_real_time_residual_grid_hz,
+from real_time_bp.scripts.sliding.common import (
+    SLIDING_TRACKING_COLUMNS,
+    sliding_residual_grid_hz,
 )
-from real_time_bp.scripts.near_real_time.heatmap import (
+from real_time_bp.scripts.sliding.heatmap import (
     iter_selected_diagnostic_cases,
     select_diagnostic_case_ids,
 )
-from real_time_bp.scripts.near_real_time.metrics import compute_practical_case
+from real_time_bp.scripts.sliding.metrics import compute_practical_case
 from real_time_bp.utils.io import iter_case_dataframes
 from real_time_bp.utils.progress import progress_iter
 from real_time_bp.utils.quality import evaluate_analysis_quality
@@ -57,13 +57,13 @@ def compute_residual_doppler_metrics(
         severities=params.get("experiments", {}).get("severities"),
         max_cases_per_condition=None,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     cases = list(iter_selected_diagnostic_cases(case_iter, selected_case_ids))
-    residual_grid = near_real_time_residual_grid_hz(params)
+    residual_grid = sliding_residual_grid_hz(params)
     for metadata, case_df in progress_iter(
         cases,
-        desc="near-real-time residual cases",
+        desc="sliding residual cases",
         total=len(cases),
         unit="case",
     ):
@@ -119,11 +119,11 @@ def compute_var_residual_diagnostics(
         severities=params.get("experiments", {}).get("severities"),
         max_cases_per_condition=None,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     rows: list[dict] = []
     experiments = params.get("experiments", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     for metadata, case_df in iter_selected_diagnostic_cases(case_iter, selected_case_ids):
         quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
         if not quality.passed:
@@ -133,13 +133,13 @@ def compute_var_residual_diagnostics(
         features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])
         _, var_result = select_var_order_bic(
             features,
-            int(near_cfg.get("var_order_min", 1)),
-            int(near_cfg.get("var_order_max", 24)),
+            int(sliding_cfg.get("var_order_min", 1)),
+            int(sliding_cfg.get("var_order_max", 24)),
         )
         test_summary = var_residual_test_summary(
             var_result,
-            alpha=float(near_cfg.get("var_test_alpha", 0.05)),
-            whiteness_lags=int(near_cfg.get("var_whiteness_test_lags", 24)),
+            alpha=float(sliding_cfg.get("var_test_alpha", 0.05)),
+            whiteness_lags=int(sliding_cfg.get("var_whiteness_test_lags", 24)),
         )
         residuals = np.asarray(var_result.resid, dtype=float)
         start_sample = int(var_result.k_ar)

@@ -246,7 +246,7 @@ def tvd_cycle_slips_per_minute(
     Methodology Section II.2, to any phase-error trace: weighted TVD estimates
     an integer cycle-bias staircase, and nonzero first differences of that
     staircase are counted as cycle slips. This helper is used for tracked,
-    batch-BP, and near-real-time BP phase errors so reported CS/min values use
+    batch-BP, and sliding BP phase errors so reported CS/min values use
     the same detector everywhere.
 
     Args:

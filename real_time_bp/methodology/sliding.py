@@ -1,4 +1,4 @@
-"""VAR-forecasted sliding-window backpropagation for near-real-time results."""
+"""VAR-forecasted sliding-window backpropagation for sliding results."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def var_residual_test_summary(
 
     Main paper:
         Results Section III.3 uses these tests as diagnostics for the VAR model
-        fit used by the forecasted near-real-time BP implementation. The
+        fit used by the forecasted sliding BP implementation. The
         default alpha=0.05 corresponds to a 95% confidence level.
 
     Args:
@@ -145,7 +145,7 @@ def sliding_window_bp_with_var_forecast(
         var_result: Fitted VAR result used to forecast unavailable samples.
 
     Returns:
-        Complex near-real-time backpropagated field with NaNs outside
+        Complex sliding backpropagated field with NaNs outside
         evaluated indices.
     """
     signal = np.asarray(scintillation_signal, dtype=complex)

@@ -1,19 +1,19 @@
-"""Generate near-real-time BP result CSV outputs."""
+"""Generate sliding BP result CSV outputs."""
 
 from __future__ import annotations
 
 from loguru import logger
 import pandas as pd
 
-from real_time_bp.scripts.near_real_time.common import (
-    NEAR_REAL_TIME_TRACKING_COLUMNS,
+from real_time_bp.scripts.sliding.common import (
+    SLIDING_TRACKING_COLUMNS,
     load_amplitude_tf_estimates,
 )
-from real_time_bp.scripts.near_real_time.diagnostics import (
+from real_time_bp.scripts.sliding.diagnostics import (
     compute_residual_doppler_metrics,
     compute_var_residual_diagnostics,
 )
-from real_time_bp.scripts.near_real_time.metrics import (
+from real_time_bp.scripts.sliding.metrics import (
     compute_practical_case_task,
     iter_practical_tasks,
     select_forecast_case_ids,
@@ -31,28 +31,28 @@ from real_time_bp.utils.stage import (
     write_sorted_csv,
 )
 
-STAGE_DIR = "04_near_real_time"
-VAR_ORDERS_CSV = "near_real_time_var_orders.csv"
-VAR_RESIDUAL_SUMMARY_CSV = "near_real_time_var_residual_summary.csv"
-VAR_FORECAST_UTILITY_CSV = "near_real_time_var_forecast_utility.csv"
-PRACTICAL_METRICS_CSV = "near_real_time_practical_metrics.csv"
-PHASE_EXAMPLE_CSV = "near_real_time_phase_example.csv"
-FORECAST_EXAMPLE_CSV = "near_real_time_forecast_example.csv"
-RESIDUAL_DOPPLER_METRICS_CSV = "near_real_time_residual_doppler_metrics.csv"
-VAR_RESIDUAL_DIAGNOSTICS_CSV = "near_real_time_var_residual_diagnostics.csv"
+STAGE_DIR = "04_sliding"
+VAR_ORDERS_CSV = "sliding_var_orders.csv"
+VAR_RESIDUAL_SUMMARY_CSV = "sliding_var_residual_summary.csv"
+VAR_FORECAST_UTILITY_CSV = "sliding_var_forecast_utility.csv"
+PRACTICAL_METRICS_CSV = "sliding_practical_metrics.csv"
+PHASE_EXAMPLE_CSV = "sliding_phase_example.csv"
+FORECAST_EXAMPLE_CSV = "sliding_forecast_example.csv"
+RESIDUAL_DOPPLER_METRICS_CSV = "sliding_residual_doppler_metrics.csv"
+VAR_RESIDUAL_DIAGNOSTICS_CSV = "sliding_var_residual_diagnostics.csv"
 
 
 def main() -> None:
-    """Run the near-real-time stage and write practical and diagnostic CSVs.
+    """Run the sliding stage and write practical and diagnostic CSVs.
 
     Main paper:
         Results Section III.3 consumes the amplitude-standard-deviation T_F
-        estimate and evaluates practical near-real-time BP and residual
+        estimate and evaluates practical sliding BP and residual
         Doppler sensitivity. The expensive full-dataset M/L heatmap is kept in
         a separate DVC stage.
     """
     configure_logging()
-    logger.info("Starting near-real-time results stage")
+    logger.info("Starting sliding results stage")
     params = load_params()
     experiments = params.get("experiments", {})
     out_dir = csv_stage_dir(STAGE_DIR)
@@ -84,7 +84,7 @@ def main() -> None:
         severities=experiments.get("severities"),
         max_cases_per_condition=max_cases,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     task_iter = iter_practical_tasks(
         case_iter,
@@ -102,7 +102,7 @@ def main() -> None:
     )
     for result in progress_iter(
         result_iter,
-        desc="near-real-time cases",
+        desc="sliding cases",
         total=total_cases,
         unit="case",
     ):
@@ -162,7 +162,7 @@ def main() -> None:
         out_dir / VAR_RESIDUAL_DIAGNOSTICS_CSV,
         ["tracking_case_id", "component", "diagnostic", "sample_index", "lag"],
     )
-    logger.info("Finished near-real-time results stage")
+    logger.info("Finished sliding results stage")
 
 
 if __name__ == "__main__":

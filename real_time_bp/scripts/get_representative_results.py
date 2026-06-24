@@ -31,11 +31,11 @@ from real_time_bp.scripts.get_filter_bank_results import (
 from real_time_bp.scripts.get_filter_bank_results import (
     STAGE_DIR as FILTER_BANK_STAGE_DIR,
 )
-from real_time_bp.scripts.near_real_time.common import (
-    NEAR_REAL_TIME_TRACKING_COLUMNS,
+from real_time_bp.scripts.sliding.common import (
+    SLIDING_TRACKING_COLUMNS,
     load_amplitude_tf_estimates,
 )
-from real_time_bp.scripts.near_real_time.metrics import compute_practical_case
+from real_time_bp.scripts.sliding.metrics import compute_practical_case
 from real_time_bp.utils.io import find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
@@ -49,13 +49,13 @@ from real_time_bp.utils.stage import (
     write_sorted_csv,
 )
 
-NEAR_REAL_TIME_STAGE_DIR = "04_near_real_time"
+SLIDING_STAGE_DIR = "04_sliding"
 FILTER_BANK_REPRESENTATIVE_SCORE_CURVES_CSV = "filter_bank_representative_score_curves.csv"
-NEAR_REAL_TIME_PHASE_EXAMPLE_CSV = "near_real_time_phase_example.csv"
+SLIDING_PHASE_EXAMPLE_CSV = "sliding_phase_example.csv"
 
 
 def main() -> None:
-    """Write representative TVD, filter-bank, and near-real-time example CSVs.
+    """Write representative TVD, filter-bank, and sliding example CSVs.
 
     Main paper:
         The representative figures are diagnostic examples, not full-dataset
@@ -116,17 +116,17 @@ def main() -> None:
         ["tracking_case_id", "sample_index"],
     )
 
-    phase_rows = compute_near_real_time_phase_rows(
+    phase_rows = compute_sliding_phase_rows(
         params,
         paths,
         selected_case_ids,
         wavelength_m,
         chunksize,
     )
-    validate_selected_cases(phase_rows, selected_case_ids, "near-real-time phase traces")
+    validate_selected_cases(phase_rows, selected_case_ids, "sliding phase traces")
     write_sorted_csv(
         pd.DataFrame(phase_rows),
-        csv_stage_dir(NEAR_REAL_TIME_STAGE_DIR) / NEAR_REAL_TIME_PHASE_EXAMPLE_CSV,
+        csv_stage_dir(SLIDING_STAGE_DIR) / SLIDING_PHASE_EXAMPLE_CSV,
         ["tracking_case_id", "sample_index"],
     )
     logger.info(
@@ -250,14 +250,14 @@ def compute_filter_bank_representative_rows(
     return score_rows, trace_rows
 
 
-def compute_near_real_time_phase_rows(
+def compute_sliding_phase_rows(
     params: dict,
     paths,
     selected_case_ids: set[int],
     wavelength_m: float,
     chunksize: int,
 ) -> list[dict]:
-    """Compute near-real-time phase examples only for selected cases."""
+    """Compute sliding phase examples only for selected cases."""
     if not selected_case_ids:
         return []
     experiments = params.get("experiments", {})
@@ -268,11 +268,11 @@ def compute_near_real_time_phase_rows(
         severities=experiments.get("severities"),
         max_cases_per_condition=None,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     for metadata, case_df in progress_iter(
         iter_selected_cases(case_iter, selected_case_ids),
-        desc="representative near-real-time cases",
+        desc="representative sliding cases",
         total=len(selected_case_ids),
         unit="case",
     ):

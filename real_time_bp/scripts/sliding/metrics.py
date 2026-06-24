@@ -1,4 +1,4 @@
-"""Near-real-time practical metric generation for representative and all cases."""
+"""Sliding practical metric generation for representative and all cases."""
 
 from __future__ import annotations
 
@@ -11,10 +11,6 @@ from real_time_bp.methodology.backpropagation import (
     unwrap_phase,
 )
 from real_time_bp.methodology.metrics import phase_rmse_rad
-from real_time_bp.methodology.near_real_time import (
-    select_var_order_bic,
-    sliding_window_bp_with_var_forecast,
-)
 from real_time_bp.methodology.signal_model import (
     detrended_intensity_db,
     estimate_sample_interval_s,
@@ -24,9 +20,13 @@ from real_time_bp.methodology.signal_model import (
     true_scintillation_phase_rad,
     true_scintillation_signal,
 )
+from real_time_bp.methodology.sliding import (
+    select_var_order_bic,
+    sliding_window_bp_with_var_forecast,
+)
 from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute
-from real_time_bp.scripts.near_real_time.common import quality_valid_case_ids, valid_eval_indices
-from real_time_bp.scripts.near_real_time.examples import (
+from real_time_bp.scripts.sliding.common import quality_valid_case_ids, valid_eval_indices
+from real_time_bp.scripts.sliding.examples import (
     forecast_example_rows,
     phase_example_rows,
 )
@@ -76,8 +76,8 @@ def iter_practical_tasks(
     phase_example_severities: set[str] = set()
     forecast_example_severities: set[str] = set()
     forecast_case_ids = forecast_case_id if isinstance(forecast_case_id, dict) else {}
-    near_cfg = params.get("near_real_time", {})
-    forecast_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
+    sliding_cfg = params.get("sliding", {})
+    forecast_c_n0 = sliding_cfg.get("forecast_example_c_n0_db_hz")
     for metadata, case_df in case_iter:
         severity = str(metadata.get("severity"))
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
@@ -138,7 +138,7 @@ def select_forecast_case_ids(
     if case_index.empty or "tracking_case_id" not in case_index.columns:
         return {}
     experiments = params.get("experiments", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     candidates = case_index.drop_duplicates("tracking_case_id").copy()
     if "loss_of_lock" in candidates.columns:
         candidates = candidates[
@@ -161,7 +161,7 @@ def select_forecast_case_ids(
     candidates = candidates[candidates["tracking_case_id"].astype(int).isin(valid_case_ids)]
     if candidates.empty:
         return {}
-    target_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
+    target_c_n0 = sliding_cfg.get("forecast_example_c_n0_db_hz")
     if target_c_n0 is not None and "input_c_n0_db_hz" in candidates:
         candidates["_c_n0_distance"] = (
             pd.to_numeric(candidates["input_c_n0_db_hz"], errors="coerce") - float(target_c_n0)
@@ -205,7 +205,7 @@ def select_forecast_case_id(
 
 
 def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
-    """Process one practical near-real-time case task.
+    """Process one practical sliding case task.
 
     Args:
         task: Tuple produced by `iter_practical_tasks`.
@@ -251,13 +251,13 @@ def compute_practical_case(
     include_forecast_example: bool = False,
     residual_doppler_error_hz: float = 0.0,
 ) -> dict[str, object]:
-    """Compute practical near-real-time metrics for one tracking case.
+    """Compute practical sliding metrics for one tracking case.
 
     Main paper:
         Methodology Eq. (13) defines the cleaned complex signal used by both
         batch and windowed BP. Methodology Section II.5 fits VAR on the same
         N_init segment used for T_F estimation. Results Figure 12 compares
-        noncausal batch BP against finite-M, finite-latency near-real-time BP.
+        noncausal batch BP against finite-M, finite-latency sliding BP.
 
     Args:
         metadata: Metadata for the tracking case.
@@ -274,11 +274,11 @@ def compute_practical_case(
         forecast-example rows.
     """
     experiments = params.get("experiments", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     tvd_cfg = params.get("tvd", {})
     n_init = int(experiments.get("n_init_samples", 4096))
-    block_len = int(near_cfg.get("practical_fft_m", 8192))
-    latency = int(near_cfg.get("practical_latency_samples", block_len // 2 - 1))
+    block_len = int(sliding_cfg.get("practical_fft_m", 8192))
+    latency = int(sliding_cfg.get("practical_latency_samples", block_len // 2 - 1))
     sample_interval_s = estimate_sample_interval_s(case_df)
     signal = estimated_scintillation_signal(case_df, wavelength_m, residual_doppler_error_hz)
     true_signal = true_scintillation_signal(case_df, wavelength_m)
@@ -302,8 +302,8 @@ def compute_practical_case(
     features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])
     var_order, var_result = select_var_order_bic(
         features,
-        int(near_cfg.get("var_order_min", 1)),
-        int(near_cfg.get("var_order_max", 24)),
+        int(sliding_cfg.get("var_order_min", 1)),
+        int(sliding_cfg.get("var_order_max", 24)),
     )
     eval_indices = valid_eval_indices(len(case_df), block_len)
     batch = batch_backpropagate(signal, sample_interval_s, estimated_tf)
@@ -340,7 +340,7 @@ def compute_practical_case(
         mask=eval_mask,
     )
     batch_mrmse_phi_r = phase_rmse_rad(true_phase[eval_mask], batch_phase[eval_mask])
-    near_real_time_mrmse_phi_r = phase_rmse_rad(
+    sliding_mrmse_phi_r = phase_rmse_rad(
         true_phase[eval_mask],
         sliding_phase[eval_mask],
     )
@@ -357,16 +357,16 @@ def compute_practical_case(
         "block_len": block_len,
         "latency_samples": latency,
         "batch_mrmse_phi_r_rad": batch_mrmse_phi_r,
-        "near_real_time_mrmse_phi_r_rad": near_real_time_mrmse_phi_r,
+        "sliding_mrmse_phi_r_rad": sliding_mrmse_phi_r,
         "tracked_mrmse_phi_s_rad": tracked_mrmse_phi_s,
         "batch_refractive_phase_rmse_rad": batch_mrmse_phi_r,
-        "near_real_time_refractive_phase_rmse_rad": near_real_time_mrmse_phi_r,
+        "sliding_refractive_phase_rmse_rad": sliding_mrmse_phi_r,
         "batch_cycle_slip_count": batch_slips,
         "batch_cs_per_min": batch_slips_per_min,
         "batch_cycle_slips_per_minute": batch_slips_per_min,
-        "near_real_time_cycle_slip_count": sliding_slips,
-        "near_real_time_cs_per_min": sliding_slips_per_min,
-        "near_real_time_cycle_slips_per_minute": sliding_slips_per_min,
+        "sliding_cycle_slip_count": sliding_slips,
+        "sliding_cs_per_min": sliding_slips_per_min,
+        "sliding_cycle_slips_per_minute": sliding_slips_per_min,
     }
     var_order_row = {
         **case_keys(metadata),
@@ -377,14 +377,14 @@ def compute_practical_case(
     var_residual_summary_rows = _var_residual_summary_rows(
         metadata,
         var_result,
-        near_cfg,
+        sliding_cfg,
     )
     var_forecast_utility_rows = _var_forecast_utility_rows(
         metadata,
         signal,
         var_result,
         n_init,
-        near_cfg,
+        sliding_cfg,
     )
     example_rows = (
         phase_example_rows(
@@ -410,8 +410,8 @@ def compute_practical_case(
             signal,
             true_signal,
             var_result,
-            int(near_cfg.get("forecast_example_block_len", block_len)),
-            [int(value) for value in near_cfg.get("forecast_example_latency_samples", [0])],
+            int(sliding_cfg.get("forecast_example_block_len", block_len)),
+            [int(value) for value in sliding_cfg.get("forecast_example_latency_samples", [0])],
         )
         if include_forecast_example
         else []
@@ -426,7 +426,7 @@ def compute_practical_case(
     }
 
 
-def _var_residual_summary_rows(metadata: dict, var_result, near_cfg: dict) -> list[dict]:
+def _var_residual_summary_rows(metadata: dict, var_result, sliding_cfg: dict) -> list[dict]:
     """Summarize residual whiteness and autocorrelation effect size.
 
     Main paper:
@@ -435,10 +435,10 @@ def _var_residual_summary_rows(metadata: dict, var_result, near_cfg: dict) -> li
         structure remains, without relying on Gaussianity as a requirement.
     """
     residuals = np.asarray(var_result.resid, dtype=float)
-    max_acf_lag = int(near_cfg.get("var_whiteness_test_lags", 24))
+    max_acf_lag = int(sliding_cfg.get("var_whiteness_test_lags", 24))
     acf_energy = _mean_component_acf_energy(residuals, max_acf_lag)
     rows = []
-    for requested_lag in near_cfg.get("var_diagnostic_whiteness_lags", [24]):
+    for requested_lag in sliding_cfg.get("var_diagnostic_whiteness_lags", [24]):
         effective_lag = max(int(requested_lag), int(var_result.k_ar) + 1)
         pvalue = _whiteness_pvalue(var_result, effective_lag)
         rows.append(
@@ -460,7 +460,7 @@ def _var_forecast_utility_rows(
     signal: np.ndarray,
     var_result,
     n_init: int,
-    near_cfg: dict,
+    sliding_cfg: dict,
 ) -> list[dict]:
     """Compare VAR forecasts against persistence over the full dataset.
 
@@ -472,7 +472,7 @@ def _var_forecast_utility_rows(
     horizons = sorted(
         {
             int(value)
-            for value in near_cfg.get("var_forecast_horizons_samples", [1, 4, 16, 64, 256])
+            for value in sliding_cfg.get("var_forecast_horizons_samples", [1, 4, 16, 64, 256])
             if int(value) > 0
         }
     )
@@ -485,7 +485,7 @@ def _var_forecast_utility_rows(
     origin_stop = features.shape[0] - max_horizon - 1
     if origin_stop <= origin_start:
         return []
-    max_eval = max(int(near_cfg.get("var_forecast_eval_samples", 32)), 1)
+    max_eval = max(int(sliding_cfg.get("var_forecast_eval_samples", 32)), 1)
     origins = np.linspace(origin_start, origin_stop, max_eval, dtype=int)
     origins = np.unique(origins)
     squared_var_errors = {horizon: [] for horizon in horizons}

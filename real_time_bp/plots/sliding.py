@@ -1,4 +1,4 @@
-"""Near-real-time figure generation from stage CSV outputs."""
+"""Sliding figure generation from stage CSV outputs."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from real_time_bp.utils.representatives import SEVERITY_ORDER, severity_groups
 from real_time_bp.utils.stage import figure_stage_dir
 
 
-def plot_near_real_time() -> None:
+def plot_sliding() -> None:
     """Render VAR, latency, practical-metric, and forecast figures.
 
     Main paper:
@@ -32,20 +32,18 @@ def plot_near_real_time() -> None:
         order distribution, practical metrics, M/L heatmap, and example
         forecasts.
     """
-    out_dir = figure_stage_dir("04_near_real_time")
-    var_orders = read_csv("04_near_real_time/near_real_time_var_orders.csv")
-    practical = read_csv("04_near_real_time/near_real_time_practical_metrics.csv")
+    out_dir = figure_stage_dir("04_sliding")
+    var_orders = read_csv("04_sliding/sliding_var_orders.csv")
+    practical = read_csv("04_sliding/sliding_practical_metrics.csv")
     tvd_summary = read_csv("02_cycle_slips/tvd_cycle_slip_summary.csv")
-    heatmap = read_csv("04_near_real_time/near_real_time_latency_heatmap.csv")
-    phase = read_csv("04_near_real_time/near_real_time_phase_example.csv")
-    forecast = read_csv("04_near_real_time/near_real_time_forecast_example.csv")
+    heatmap = read_csv("04_sliding/sliding_latency_heatmap.csv")
+    phase = read_csv("04_sliding/sliding_phase_example.csv")
+    forecast = read_csv("04_sliding/sliding_forecast_example.csv")
 
     _plot_var_orders(var_orders, out_dir / "var_order_histogram.pdf")
-    _plot_practical_metrics(
-        practical, tvd_summary, out_dir / "batch_vs_near_real_time_metrics.pdf"
-    )
+    _plot_practical_metrics(practical, tvd_summary, out_dir / "batch_vs_sliding_metrics.pdf")
     _plot_latency_heatmap(heatmap, out_dir / "latency_heatmap.pdf")
-    _plot_phase_example(phase, out_dir / "near_real_time_phase_example.pdf")
+    _plot_phase_example(phase, out_dir / "sliding_phase_example.pdf")
     _plot_forecast_example(forecast, out_dir / "var_forecast_example.pdf")
     remove_figure(out_dir / "var_model_diagnostics.pdf")
     remove_figure(out_dir / "var_residual_diagnostics.pdf")
@@ -81,16 +79,16 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
 
 
 def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) -> None:
-    """Plot batch BP versus near-real-time BP practical metrics.
+    """Plot batch BP versus sliding BP practical metrics.
 
     Main paper:
         Results Figure 12 compares the noncausal batch BP reference with the
-        practical near-real-time BP operating point. The first panel reports
+        practical sliding BP operating point. The first panel reports
         MRMSE_phi_r after BP and the tracked MRMSE_phi_s baseline before BP.
         The second panel reports TVD-derived cycle-slip rates.
     """
     if df.empty:
-        placeholder(path, "No practical near-real-time metric data")
+        placeholder(path, "No practical sliding metric data")
         return
     fig, axes = plt.subplots(1, 2, figsize=figure_size("two_panel"), sharex=False)
     batch_col = _first_column(
@@ -99,11 +97,11 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         "batch_refractive_phase_rmse_rad",
         "batch_phase_rmse_rad",
     )
-    near_col = _first_column(
+    sliding_col = _first_column(
         df,
-        "near_real_time_mrmse_phi_r_rad",
-        "near_real_time_refractive_phase_rmse_rad",
-        "near_real_time_phase_rmse_rad",
+        "sliding_mrmse_phi_r_rad",
+        "sliding_refractive_phase_rmse_rad",
+        "sliding_phase_rmse_rad",
     )
     tracked_col = _optional_column(df, "tracked_mrmse_phi_s_rad")
     batch_cs_col = _first_column(
@@ -111,10 +109,10 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         "batch_cs_per_min",
         "batch_cycle_slips_per_minute",
     )
-    near_cs_col = _first_column(
+    sliding_cs_col = _first_column(
         df,
-        "near_real_time_cs_per_min",
-        "near_real_time_cycle_slips_per_minute",
+        "sliding_cs_per_min",
+        "sliding_cycle_slips_per_minute",
     )
     n_value = (
         int(df["n_init_samples"].dropna().iloc[0])
@@ -132,7 +130,7 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         else None
     )
     for severity, group in severity_groups(df):
-        metric_cols = [batch_col, near_col, batch_cs_col, near_cs_col]
+        metric_cols = [batch_col, sliding_col, batch_cs_col, sliding_cs_col]
         if tracked_col is not None:
             metric_cols.append(tracked_col)
         clean = _mean_by_c_n0(group, metric_cols)
@@ -156,7 +154,7 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         )
         axes[0].plot(
             clean["input_c_n0_db_hz"],
-            clean[near_col],
+            clean[sliding_col],
             color=color,
             label=rf"{severity} sliding $\mathrm{{MRMSE}}_{{\phi_r}}$",
         )
@@ -170,7 +168,7 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         )
         axes[1].plot(
             clean["input_c_n0_db_hz"],
-            clean[near_cs_col],
+            clean[sliding_cs_col],
             color=color,
             label=rf"{severity} sliding BP",
         )
@@ -296,10 +294,10 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
 
 
 def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
-    """Plot representative phase traces for batch and near-real-time BP.
+    """Plot representative phase traces for batch and sliding BP.
 
     Main paper:
-        Results Figure 13 compares truth, batch BP, and near-real-time BP for
+        Results Figure 13 compares truth, batch BP, and sliding BP for
         representative cases.
     """
     if df.empty:
@@ -378,10 +376,10 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 linewidth=1.0,
                 label=r"$\hat{\phi}_s-\phi_r$",
             )
-        near_col = column(
+        sliding_col = column(
             severity_group,
-            "near_real_time_refractive_phase_error_rad",
-            "near_real_time_phase_error_rad",
+            "sliding_refractive_phase_error_rad",
+            "sliding_phase_error_rad",
         )
         config_groups = severity_group.sort_values(["latency_samples", "sample_index"]).groupby(
             "latency_samples", sort=True
@@ -391,7 +389,7 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
         config_colors = config_cmap(np.linspace(0.2, 0.85, len(config_items)))
         finite_times = []
         for color, (latency, config_group) in zip(config_colors, config_items):
-            phase_error_cycles = config_group[near_col] / (2.0 * np.pi)
+            phase_error_cycles = config_group[sliding_col] / (2.0 * np.pi)
             finite = np.isfinite(phase_error_cycles)
             finite_times.extend(config_group.loc[finite, "time_sec"].to_list())
             ax.plot(
@@ -432,11 +430,11 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         return
     params = load_params()
     plot_cfg = params.get("plots", {})
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     zoom_start_s = plot_cfg.get("forecast_zoom_start_s")
     zoom_end_s = plot_cfg.get("forecast_zoom_end_s")
     requested_latencies = [
-        int(value) for value in near_cfg.get("forecast_example_latency_samples", [])
+        int(value) for value in sliding_cfg.get("forecast_example_latency_samples", [])
     ]
     severities = [severity for severity in ["weak", "strong"] if severity in set(SEVERITY_ORDER)]
     fig, axes = plt.subplots(

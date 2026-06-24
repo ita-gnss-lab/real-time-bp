@@ -96,23 +96,23 @@ stages:
       - results/csv/03_filter_bank/filter_bank_n_init_sensitivity.csv
       - results/csv/03_filter_bank/filter_bank_boxplot_estimates.csv
 
-  near_real_time_results:
-    cmd: uv run python -m real_time_bp.scripts.get_near_real_time_results
+  sliding_results:
+    cmd: uv run python -m real_time_bp.scripts.get_sliding_results
     deps:
       - real_time_bp/__init__.py
       - real_time_bp/config.py
-      - real_time_bp/scripts/get_near_real_time_results.py
-      - real_time_bp/scripts/near_real_time/common.py
-      - real_time_bp/scripts/near_real_time/diagnostics.py
-      - real_time_bp/scripts/near_real_time/examples.py
-      - real_time_bp/scripts/near_real_time/heatmap.py
-      - real_time_bp/scripts/near_real_time/metrics.py
+      - real_time_bp/scripts/get_sliding_results.py
+      - real_time_bp/scripts/sliding/common.py
+      - real_time_bp/scripts/sliding/diagnostics.py
+      - real_time_bp/scripts/sliding/examples.py
+      - real_time_bp/scripts/sliding/heatmap.py
+      - real_time_bp/scripts/sliding/metrics.py
       - real_time_bp/utils/stage.py
       - real_time_bp/methodology/backpropagation.py
       - real_time_bp/methodology/constants.py
       - real_time_bp/methodology/filter_bank.py
       - real_time_bp/methodology/metrics.py
-      - real_time_bp/methodology/near_real_time.py
+      - real_time_bp/methodology/sliding.py
       - real_time_bp/methodology/signal_model.py
       - real_time_bp/methodology/tvd.py
       - real_time_bp/utils/representatives.py
@@ -130,48 +130,48 @@ stages:
       - runtime
       - constants
       - experiments
-      - near_real_time.var_order_min
-      - near_real_time.var_order_max
-      - near_real_time.practical_fft_m
-      - near_real_time.practical_latency_samples
-      - near_real_time.residual_doppler_error_hz_min
-      - near_real_time.residual_doppler_error_hz_max
-      - near_real_time.residual_doppler_error_count
-      - near_real_time.var_test_alpha
-      - near_real_time.var_whiteness_test_lags
-      - near_real_time.var_diagnostic_whiteness_lags
-      - near_real_time.var_diagnostic_plot_whiteness_lag
-      - near_real_time.var_forecast_horizons_samples
-      - near_real_time.var_forecast_eval_samples
-      - near_real_time.diagnostic_max_cases_per_severity
-      - near_real_time.forecast_example_c_n0_db_hz
-      - near_real_time.forecast_example_block_len
-      - near_real_time.forecast_example_latency_samples
+      - sliding.var_order_min
+      - sliding.var_order_max
+      - sliding.practical_fft_m
+      - sliding.practical_latency_samples
+      - sliding.residual_doppler_error_hz_min
+      - sliding.residual_doppler_error_hz_max
+      - sliding.residual_doppler_error_count
+      - sliding.var_test_alpha
+      - sliding.var_whiteness_test_lags
+      - sliding.var_diagnostic_whiteness_lags
+      - sliding.var_diagnostic_plot_whiteness_lag
+      - sliding.var_forecast_horizons_samples
+      - sliding.var_forecast_eval_samples
+      - sliding.diagnostic_max_cases_per_severity
+      - sliding.forecast_example_c_n0_db_hz
+      - sliding.forecast_example_block_len
+      - sliding.forecast_example_latency_samples
       - quality_control
       - tvd
     outs:
-      - results/csv/04_near_real_time/near_real_time_var_orders.csv
-      - results/csv/04_near_real_time/near_real_time_var_residual_summary.csv
-      - results/csv/04_near_real_time/near_real_time_var_forecast_utility.csv
-      - results/csv/04_near_real_time/near_real_time_practical_metrics.csv
-      - results/csv/04_near_real_time/near_real_time_forecast_example.csv
-      - results/csv/04_near_real_time/near_real_time_residual_doppler_metrics.csv
-      - results/csv/04_near_real_time/near_real_time_var_residual_diagnostics.csv
+      - results/csv/04_sliding/sliding_var_orders.csv
+      - results/csv/04_sliding/sliding_var_residual_summary.csv
+      - results/csv/04_sliding/sliding_var_forecast_utility.csv
+      - results/csv/04_sliding/sliding_practical_metrics.csv
+      - results/csv/04_sliding/sliding_forecast_example.csv
+      - results/csv/04_sliding/sliding_residual_doppler_metrics.csv
+      - results/csv/04_sliding/sliding_var_residual_diagnostics.csv
 
-  near_real_time_heatmap:
-    cmd: uv run python -m real_time_bp.scripts.get_near_real_time_heatmap
+  sliding_heatmap:
+    cmd: uv run python -m real_time_bp.scripts.get_sliding_heatmap
     deps:
       - real_time_bp/__init__.py
       - real_time_bp/config.py
-      - real_time_bp/scripts/get_near_real_time_heatmap.py
-      - real_time_bp/scripts/near_real_time/common.py
-      - real_time_bp/scripts/near_real_time/heatmap.py
+      - real_time_bp/scripts/get_sliding_heatmap.py
+      - real_time_bp/scripts/sliding/common.py
+      - real_time_bp/scripts/sliding/heatmap.py
       - real_time_bp/utils/stage.py
       - real_time_bp/methodology/backpropagation.py
       - real_time_bp/methodology/constants.py
       - real_time_bp/methodology/filter_bank.py
       - real_time_bp/methodology/metrics.py
-      - real_time_bp/methodology/near_real_time.py
+      - real_time_bp/methodology/sliding.py
       - real_time_bp/methodology/signal_model.py
       - real_time_bp/methodology/tvd.py
       - real_time_bp/utils/io.py
@@ -187,16 +187,16 @@ stages:
       - runtime
       - constants
       - experiments
-      - near_real_time.var_order_min
-      - near_real_time.var_order_max
-      - near_real_time.fft_m_values
-      - near_real_time.heatmap_latency_fractions
-      - near_real_time.heatmap_cases_per_severity
+      - sliding.var_order_min
+      - sliding.var_order_max
+      - sliding.fft_m_values
+      - sliding.heatmap_latency_fractions
+      - sliding.heatmap_cases_per_severity
       - quality_control
       - tvd
     outs:
-      - results/csv/04_near_real_time/near_real_time_latency_heatmap_cases.csv
-      - results/csv/04_near_real_time/near_real_time_latency_heatmap.csv
+      - results/csv/04_sliding/sliding_latency_heatmap_cases.csv
+      - results/csv/04_sliding/sliding_latency_heatmap.csv
 
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
@@ -206,15 +206,15 @@ stages:
       - real_time_bp/scripts/get_representative_results.py
       - real_time_bp/scripts/get_cycle_slip_results.py
       - real_time_bp/scripts/get_filter_bank_results.py
-      - real_time_bp/scripts/near_real_time/common.py
-      - real_time_bp/scripts/near_real_time/examples.py
-      - real_time_bp/scripts/near_real_time/metrics.py
+      - real_time_bp/scripts/sliding/common.py
+      - real_time_bp/scripts/sliding/examples.py
+      - real_time_bp/scripts/sliding/metrics.py
       - real_time_bp/utils/stage.py
       - real_time_bp/methodology/backpropagation.py
       - real_time_bp/methodology/constants.py
       - real_time_bp/methodology/filter_bank.py
       - real_time_bp/methodology/metrics.py
-      - real_time_bp/methodology/near_real_time.py
+      - real_time_bp/methodology/sliding.py
       - real_time_bp/methodology/signal_model.py
       - real_time_bp/methodology/tvd.py
       - real_time_bp/utils/io.py
@@ -231,11 +231,11 @@ stages:
       - runtime
       - constants
       - experiments
-      - near_real_time.var_order_min
-      - near_real_time.var_order_max
-      - near_real_time.practical_fft_m
-      - near_real_time.practical_latency_samples
-      - near_real_time.example_ml_configs
+      - sliding.var_order_min
+      - sliding.var_order_max
+      - sliding.practical_fft_m
+      - sliding.practical_latency_samples
+      - sliding.example_ml_configs
       - quality_control
       - representatives
       - tvd
@@ -244,7 +244,7 @@ stages:
       - results/csv/02_cycle_slips/tvd_example_traces.csv
       - results/csv/03_filter_bank/filter_bank_representative_score_curves.csv
       - results/csv/03_filter_bank/filter_bank_representative_phase_traces.csv
-      - results/csv/04_near_real_time/near_real_time_phase_example.csv
+      - results/csv/04_sliding/sliding_phase_example.csv
 
   result_plots:
     cmd: uv run python -m real_time_bp.plots.main
@@ -255,7 +255,7 @@ stages:
       - real_time_bp/plots/cycle_slips.py
       - real_time_bp/plots/filter_bank.py
       - real_time_bp/plots/main.py
-      - real_time_bp/plots/near_real_time.py
+      - real_time_bp/plots/sliding.py
       - real_time_bp/utils/plot_style.py
       - real_time_bp/utils/representatives.py
       - real_time_bp/utils/stage.py
@@ -265,11 +265,15 @@ stages:
       - results/csv/01_dataset
       - results/csv/02_cycle_slips
       - results/csv/03_filter_bank
-      - results/csv/04_near_real_time
+      - results/csv/04_sliding/sliding_var_orders.csv
+      - results/csv/04_sliding/sliding_practical_metrics.csv
+      - results/csv/04_sliding/sliding_latency_heatmap.csv
+      - results/csv/04_sliding/sliding_phase_example.csv
+      - results/csv/04_sliding/sliding_forecast_example.csv
     params:
       - plots
       - experiments
-      - near_real_time
+      - sliding
       - representatives
       - tvd
     plots:

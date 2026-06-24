@@ -1,4 +1,4 @@
-"""Shared inputs and small utilities for near-real-time result stages."""
+"""Shared inputs and small utilities for sliding result stages."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from real_time_bp.utils.io import iter_case_dataframes
 from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.stage import csv_chunksize_from_params, l1_wavelength_from_params
 
-NEAR_REAL_TIME_TRACKING_COLUMNS = {
+SLIDING_TRACKING_COLUMNS = {
     "estimated_scintillation_phase_m",
     "scint_phase_m",
     "time_sec",
@@ -48,7 +48,7 @@ def quality_valid_case_ids(
         severities=experiments.get("severities"),
         max_cases_per_condition=None,
         chunksize=chunksize,
-        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+        columns=SLIDING_TRACKING_COLUMNS,
     )
     for metadata, case_df in case_iter:
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
@@ -90,14 +90,14 @@ def valid_eval_indices(n_samples: int, block_len: int) -> np.ndarray:
 
     Main paper:
         Methodology Eq. (18) excludes edge samples without full past/future
-        block support from near-real-time BP evaluation.
+        block support from sliding BP evaluation.
 
     Args:
         n_samples: Total number of samples in the case.
         block_len: Sliding FFT block length.
 
     Returns:
-        Integer indices where the near-real-time BP window can be evaluated.
+        Integer indices where the sliding BP window can be evaluated.
     """
     half = int(block_len) // 2
     future_context = int(block_len) - half - 1
@@ -125,8 +125,8 @@ def thin_eval_indices(indices: np.ndarray, max_points: int) -> np.ndarray:
     return indices[positions]
 
 
-def near_real_time_residual_grid_hz(params: dict) -> pd.DataFrame:
-    """Construct the residual Doppler grid for near-real-time sensitivity plots.
+def sliding_residual_grid_hz(params: dict) -> pd.DataFrame:
+    """Construct the residual Doppler grid for sliding sensitivity plots.
 
     Args:
         params: Parsed `params.yaml` dictionary.
@@ -134,10 +134,10 @@ def near_real_time_residual_grid_hz(params: dict) -> pd.DataFrame:
     Returns:
         DataFrame with one `residual_doppler_error_hz` column.
     """
-    near_cfg = params.get("near_real_time", {})
+    sliding_cfg = params.get("sliding", {})
     values = np.linspace(
-        float(near_cfg.get("residual_doppler_error_hz_min", 0.0)),
-        float(near_cfg.get("residual_doppler_error_hz_max", 1.5)),
-        int(near_cfg.get("residual_doppler_error_count", 16)),
+        float(sliding_cfg.get("residual_doppler_error_hz_min", 0.0)),
+        float(sliding_cfg.get("residual_doppler_error_hz_max", 1.5)),
+        int(sliding_cfg.get("residual_doppler_error_count", 16)),
     )
     return pd.DataFrame({"residual_doppler_error_hz": values})

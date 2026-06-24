@@ -420,7 +420,7 @@ def _compute_n_init_sensitivity(
 
     Main paper:
         Results Figure 4 sweeps N_init to justify the fixed initialization
-        length used by the later filter-bank and near-real-time experiments.
+        length used by the later filter-bank and sliding experiments.
     """
     experiments = params.get("experiments", {})
     rows: list[dict] = []

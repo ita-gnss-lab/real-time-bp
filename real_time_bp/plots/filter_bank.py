@@ -277,7 +277,7 @@ def _plot_n_init_sensitivity(
 
     Main paper:
         Results Figure 4 justifies the fixed initialization length used in
-        later filter-bank and near-real-time experiments.
+        later filter-bank and sliding experiments.
     """
     if df.empty:
         placeholder(path, "No initialization sensitivity data")

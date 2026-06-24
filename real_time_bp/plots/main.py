@@ -6,7 +6,7 @@ from loguru import logger
 
 from real_time_bp.plots.cycle_slips import plot_cycle_slips
 from real_time_bp.plots.filter_bank import plot_filter_bank
-from real_time_bp.plots.near_real_time import plot_near_real_time
+from real_time_bp.plots.sliding import plot_sliding
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import apply_plot_style
 from real_time_bp.utils.progress import configure_logging
@@ -20,7 +20,7 @@ def main() -> None:
     load_params()
     plot_cycle_slips()
     plot_filter_bank()
-    plot_near_real_time()
+    plot_sliding()
     logger.info("Finished result plot stage")
 
 
