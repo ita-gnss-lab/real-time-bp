@@ -72,6 +72,8 @@ near_real_time:
     min: 0.0
     max: 1.0
     step: 0.05
+  # Full-time heatmap uses the lowest-C/N0 quality-passing cases per severity.
+  heatmap_cases_per_severity: 1
   # Paper: Results Section III.3, Figure 12; practical operating
   # point used for the batch vs near-real-time comparison.
   practical_fft_m: 1024

@@ -190,6 +190,7 @@ stages:
       - near_real_time.var_order_max
       - near_real_time.fft_m_values
       - near_real_time.heatmap_latency_fractions
+      - near_real_time.heatmap_cases_per_severity
       - quality_control
     outs:
       - results/csv/04_near_real_time/near_real_time_latency_heatmap_cases.csv
