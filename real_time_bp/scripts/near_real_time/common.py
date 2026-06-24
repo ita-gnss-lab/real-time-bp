@@ -7,6 +7,9 @@ import pandas as pd
 
 from real_time_bp.config import CSV_RESULTS_DIR
 from real_time_bp.methodology.filter_bank import AMPLITUDE_SCORE_NAME
+from real_time_bp.utils.io import iter_case_dataframes
+from real_time_bp.utils.quality import evaluate_analysis_quality
+from real_time_bp.utils.stage import csv_chunksize_from_params, l1_wavelength_from_params
 
 NEAR_REAL_TIME_TRACKING_COLUMNS = {
     "estimated_scintillation_phase_m",
@@ -16,6 +19,48 @@ NEAR_REAL_TIME_TRACKING_COLUMNS = {
     "true_intensity",
     "true_refractive_phase_m",
 }
+
+
+def quality_valid_case_ids(
+    params: dict,
+    paths,
+    candidate_case_ids: set[int],
+) -> set[int]:
+    """Return candidate case ids accepted by the shared analysis quality gate.
+
+    Args:
+        params: Parsed `params.yaml` dictionary.
+        paths: Resolved dataset paths.
+        candidate_case_ids: Case ids considered for example selection.
+
+    Returns:
+        Candidate ids whose tracking samples pass `quality_control`.
+    """
+    if not candidate_case_ids:
+        return set()
+    wavelength_m = l1_wavelength_from_params(params)
+    experiments = params.get("experiments", {})
+    chunksize = csv_chunksize_from_params(params)
+    valid: set[int] = set()
+    seen: set[int] = set()
+    case_iter = iter_case_dataframes(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=None,
+        chunksize=chunksize,
+        columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
+    )
+    for metadata, case_df in case_iter:
+        case_id = int(metadata.get("tracking_case_id", 0) or 0)
+        if case_id not in candidate_case_ids:
+            continue
+        seen.add(case_id)
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if quality.passed:
+            valid.add(case_id)
+        if seen == candidate_case_ids:
+            break
+    return valid
 
 
 def load_amplitude_tf_estimates() -> dict[int, float]:

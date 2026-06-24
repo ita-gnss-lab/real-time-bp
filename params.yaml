@@ -13,6 +13,13 @@ constants:
   speed_of_light_m_s: 299792458.0
   gps_l1_hz: 1575420000.0
 
+quality_control:
+  # Analysis guard: remove cases that lost carrier lock explicitly, plus cases
+  # where hat_phi_s - phi_r contains a gross ramp even if the lock flag is false.
+  exclude_loss_of_lock: true
+  max_abs_diffractive_phase_slope_cycles_per_s: 0.5
+  max_diffractive_phase_span_cycles: 100.0
+
 experiments:
   # Paper: Results Section III.1; the dataset is stratified
   # by scintillation severity and carrier-to-noise ratio.
@@ -65,9 +72,6 @@ near_real_time:
     min: 0.0
     max: 1.0
     step: 0.05
-  # Paper: Figure 11 is an aggregate diagnostic; this many evenly spaced
-  # time samples are evaluated per M/L cell to keep the DVC stage tractable.
-  heatmap_eval_samples: 750
   # Paper: Results Section III.3, Figure 12; practical operating
   # point used for the batch vs near-real-time comparison.
   practical_fft_m: 1024
@@ -89,7 +93,7 @@ near_real_time:
     - 64
     - 256
   var_forecast_eval_samples: 32
-  heatmap_max_cases_per_severity: 1
+  diagnostic_max_cases_per_severity: 1
   forecast_example_c_n0_db_hz: 35.0
   forecast_example_block_len: 8192
   forecast_example_latency_samples:

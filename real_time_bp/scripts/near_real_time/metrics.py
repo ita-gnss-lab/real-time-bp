@@ -23,14 +23,19 @@ from real_time_bp.methodology.signal_model import (
     true_scintillation_phase_rad,
     true_scintillation_signal,
 )
-from real_time_bp.scripts.near_real_time.common import valid_eval_indices
+from real_time_bp.scripts.near_real_time.common import quality_valid_case_ids, valid_eval_indices
 from real_time_bp.scripts.near_real_time.examples import (
     forecast_example_rows,
     phase_example_rows,
 )
 from real_time_bp.utils.io import load_case_index
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.representatives import SEVERITY_ORDER
-from real_time_bp.utils.stage import case_keys, is_representative_case
+from real_time_bp.utils.stage import (
+    case_keys,
+    is_loss_of_lock,
+    is_representative_case,
+)
 
 
 def iter_practical_tasks(
@@ -133,6 +138,10 @@ def select_forecast_case_ids(
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
     candidates = case_index.drop_duplicates("tracking_case_id").copy()
+    if "loss_of_lock" in candidates.columns:
+        candidates = candidates[
+            ~candidates.apply(lambda row: is_loss_of_lock(row.to_dict()), axis=1)
+        ]
     severity_filter = [str(value) for value in (experiments.get("severities") or [])]
     if not severity_filter:
         severity_filter = list(SEVERITY_ORDER)
@@ -140,6 +149,14 @@ def select_forecast_case_ids(
         candidates = candidates[candidates["severity"].astype(str).isin(severity_filter)]
     if tf_estimates:
         candidates = candidates[candidates["tracking_case_id"].astype(int).isin(set(tf_estimates))]
+    if candidates.empty:
+        return {}
+    valid_case_ids = quality_valid_case_ids(
+        params,
+        paths,
+        set(candidates["tracking_case_id"].astype(int).to_numpy()),
+    )
+    candidates = candidates[candidates["tracking_case_id"].astype(int).isin(valid_case_ids)]
     if candidates.empty:
         return {}
     target_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
@@ -207,6 +224,9 @@ def compute_practical_case_task(task: tuple) -> dict[str, object] | None:
     case_id = int(metadata.get("tracking_case_id", 0) or 0)
     estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
     if not np.isfinite(estimated_tf):
+        return None
+    quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+    if not quality.passed:
         return None
     return compute_practical_case(
         metadata,

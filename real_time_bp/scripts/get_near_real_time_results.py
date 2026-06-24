@@ -13,7 +13,6 @@ from real_time_bp.scripts.near_real_time.diagnostics import (
     compute_residual_doppler_metrics,
     compute_var_residual_diagnostics,
 )
-from real_time_bp.scripts.near_real_time.heatmap import compute_heatmap
 from real_time_bp.scripts.near_real_time.metrics import (
     compute_practical_case_task,
     iter_practical_tasks,
@@ -39,18 +38,18 @@ VAR_FORECAST_UTILITY_CSV = "near_real_time_var_forecast_utility.csv"
 PRACTICAL_METRICS_CSV = "near_real_time_practical_metrics.csv"
 PHASE_EXAMPLE_CSV = "near_real_time_phase_example.csv"
 FORECAST_EXAMPLE_CSV = "near_real_time_forecast_example.csv"
-LATENCY_HEATMAP_CSV = "near_real_time_latency_heatmap.csv"
 RESIDUAL_DOPPLER_METRICS_CSV = "near_real_time_residual_doppler_metrics.csv"
 VAR_RESIDUAL_DIAGNOSTICS_CSV = "near_real_time_var_residual_diagnostics.csv"
 
 
 def main() -> None:
-    """Run the near-real-time stage and write practical, heatmap, and diagnostic CSVs.
+    """Run the near-real-time stage and write practical and diagnostic CSVs.
 
     Main paper:
         Results Section III.3 consumes the amplitude-standard-deviation T_F
-        estimate and evaluates practical near-real-time BP, residual Doppler
-        sensitivity, and the M/L latency heatmap.
+        estimate and evaluates practical near-real-time BP and residual
+        Doppler sensitivity. The expensive full-dataset M/L heatmap is kept in
+        a separate DVC stage.
     """
     configure_logging()
     logger.info("Starting near-real-time results stage")
@@ -128,7 +127,6 @@ def main() -> None:
         set(),
     )
 
-    heatmap_df = compute_heatmap(params, paths, wavelength_m, tf_estimates)
     write_sorted_csv(
         pd.DataFrame(var_order_rows),
         out_dir / VAR_ORDERS_CSV,
@@ -153,11 +151,6 @@ def main() -> None:
         pd.DataFrame(forecast_rows),
         out_dir / FORECAST_EXAMPLE_CSV,
         ["tracking_case_id", "latency_samples", "sample_index"],
-    )
-    write_sorted_csv(
-        heatmap_df,
-        out_dir / LATENCY_HEATMAP_CSV,
-        ["tracking_case_id", "block_len", "latency_samples"],
     )
     write_sorted_csv(
         residual_metrics,

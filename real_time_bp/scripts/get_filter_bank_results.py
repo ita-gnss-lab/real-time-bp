@@ -38,6 +38,7 @@ from real_time_bp.utils.output_rows import sampled_time_rows
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import fixed_step_values, load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.representatives import (
     severity_groups,
     sort_by_severity,
@@ -135,6 +136,8 @@ def main() -> None:
         total=total_cases,
         unit="case",
     ):
+        if result is None:
+            continue
         score_rows.extend(result["score_rows"])
         estimate_rows.extend(result["estimate_rows"])
         downstream_rows.extend(result["downstream_rows"])
@@ -377,7 +380,7 @@ def _iter_filter_bank_tasks(
         )
 
 
-def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]]:
+def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]] | None:
     (
         metadata,
         case_df,
@@ -389,6 +392,9 @@ def _compute_case_filter_bank_task(task: tuple) -> dict[str, list[dict]]:
         score_n_init_samples,
         include_trace,
     ) = task
+    quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+    if not quality.passed:
+        return None
     return _compute_case_filter_bank(
         metadata,
         case_df,
@@ -460,6 +466,8 @@ def _compute_n_init_sensitivity(
             total=total_cases,
             unit="case",
         ):
+            if result is None:
+                continue
             estimate_rows.extend(result["estimate_rows"])
             downstream_rows.extend(result["downstream_rows"])
         estimates = pd.DataFrame(estimate_rows)
@@ -539,6 +547,8 @@ def _compute_boxplot_estimates(
         total=total_cases,
         unit="case",
     ):
+        if result is None:
+            continue
         estimate_rows.extend(result["estimate_rows"])
     return sort_by_severity(pd.DataFrame(estimate_rows), ["tracking_case_id"])
 

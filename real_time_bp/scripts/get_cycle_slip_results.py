@@ -19,6 +19,7 @@ from real_time_bp.utils.output_rows import sampled_time_rows
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.representatives import SEVERITY_ORDER, sort_by_severity
 from real_time_bp.utils.stage import (
     BufferedCsvWriter,
@@ -74,6 +75,8 @@ SUMMARY_COLUMNS = [
     "cycle_slips_per_minute",
     "diffractive_phase_slope_cycles_per_s",
     "diffractive_phase_span_cycles",
+    "analysis_quality_pass",
+    "analysis_quality_reason",
 ]
 TRACE_COLUMNS = [
     "tracking_case_id",
@@ -154,7 +157,7 @@ def main() -> None:
         chunksize=chunksize,
         columns=TVD_TRACKING_COLUMNS,
     )
-    task_iter = _iter_tvd_tasks(case_iter, tvd_cfg, wavelength_m)
+    task_iter = _iter_tvd_tasks(case_iter, params, tvd_cfg, wavelength_m)
     result_iter = ordered_parallel_map(
         _compute_tvd_case,
         task_iter,
@@ -178,17 +181,20 @@ def main() -> None:
             total=total_cases,
             unit="case",
         ):
-            event_writer.write_many(result["event_rows"])
             summary_row = result["summary_row"]
+            if summary_row is None:
+                continue
+            event_writer.write_many(result["event_rows"])
             summary_writer.write(summary_row)
     logger.info("Finished TVD cycle-slip stage")
 
 
-def _iter_tvd_tasks(case_iter, tvd_cfg: dict, wavelength_m: float):
+def _iter_tvd_tasks(case_iter, params: dict, tvd_cfg: dict, wavelength_m: float):
     for metadata, case_df in case_iter:
         yield (
             metadata,
             case_df,
+            params,
             wavelength_m,
             float(tvd_cfg.get("fade_threshold_db", -15.0)),
             float(tvd_cfg.get("allowed_jump_weight", 1.0)),
@@ -210,17 +216,23 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
     (
         metadata,
         case_df,
+        params,
         wavelength_m,
         threshold_db,
         allowed_jump_weight,
         blocked_jump_weight,
     ) = task
+    quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+    if not quality.passed:
+        return {
+            "event_rows": [],
+            "summary_row": None,
+        }
     time_sec = case_df["time_sec"].to_numpy(dtype=float)
     intensity_db = detrended_intensity_db(case_df)
     estimated_phase = estimated_scintillation_phase_rad(case_df, float(wavelength_m))
     true_refractive = true_refractive_phase_rad(case_df, float(wavelength_m))
     diffractive_phase = estimated_phase - true_refractive
-    diffractive_phase_cycles = diffractive_phase / (2.0 * np.pi)
     fade_minima, integer_cycle_bias, cycle_slip_indices = detect_cycle_slips_from_tvd(
         diffractive_phase,
         intensity_db,
@@ -260,15 +272,10 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         "cycle_slips_per_minute": float(cycle_slip_indices.size / duration_min)
         if duration_min and duration_min > 0
         else np.nan,
-        "diffractive_phase_slope_cycles_per_s": _linear_slope_cycles_per_s(
-            time_sec,
-            diffractive_phase_cycles,
-        ),
-        "diffractive_phase_span_cycles": float(
-            np.nanmax(diffractive_phase_cycles) - np.nanmin(diffractive_phase_cycles)
-        )
-        if diffractive_phase_cycles.size
-        else np.nan,
+        "diffractive_phase_slope_cycles_per_s": quality.slope_cycles_per_s,
+        "diffractive_phase_span_cycles": quality.span_cycles,
+        "analysis_quality_pass": quality.passed,
+        "analysis_quality_reason": quality.reason,
     }
 
     return {
@@ -356,6 +363,11 @@ def _compute_tvd_trace_rows(
 
 
 def _representative_rank_key(summary_row: dict) -> tuple[float, ...] | None:
+    quality_pass = summary_row.get("analysis_quality_pass", True)
+    if isinstance(quality_pass, str):
+        quality_pass = quality_pass.strip().lower() in {"1", "true", "yes"}
+    if not bool(quality_pass):
+        return None
     if is_loss_of_lock(summary_row):
         return None
     severity = str(summary_row.get("severity"))
@@ -384,16 +396,6 @@ def _representative_rows(
         )
         rows.append(row)
     return sort_by_severity(pd.DataFrame(rows)).to_dict("records") if rows else []
-
-
-def _linear_slope_cycles_per_s(time_sec: np.ndarray, phase_cycles: np.ndarray) -> float:
-    if time_sec.size < 2 or phase_cycles.size < 2:
-        return float("nan")
-    time_rel = time_sec - time_sec[0]
-    finite = np.isfinite(time_rel) & np.isfinite(phase_cycles)
-    if finite.sum() < 2:
-        return float("nan")
-    return float(np.polyfit(time_rel[finite], phase_cycles[finite], 1)[0])
 
 
 if __name__ == "__main__":

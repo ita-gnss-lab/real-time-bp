@@ -39,6 +39,7 @@ from real_time_bp.scripts.near_real_time.metrics import compute_practical_case
 from real_time_bp.utils.io import find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.stage import (
     csv_chunksize_from_params,
     csv_stage_dir,
@@ -142,6 +143,8 @@ def select_representative_rows(params: dict) -> list[dict]:
     summary_df = pd.read_csv(summary_path)
     candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]] = {}
     for summary_row in summary_df.to_dict("records"):
+        if not summary_row_passes_quality(summary_row, params):
+            continue
         rank_key = _representative_rank_key(summary_row)
         if rank_key is None:
             continue
@@ -183,6 +186,9 @@ def compute_tvd_trace_rows(
         total=len(selected_case_ids),
         unit="case",
     ):
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if not quality.passed:
+            continue
         rows.extend(
             _compute_tvd_trace_rows(
                 metadata,
@@ -225,6 +231,9 @@ def compute_filter_bank_representative_rows(
         total=len(selected_case_ids),
         unit="case",
     ):
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if not quality.passed:
+            continue
         result = _compute_case_filter_bank(
             metadata,
             case_df,
@@ -267,6 +276,9 @@ def compute_near_real_time_phase_rows(
         total=len(selected_case_ids),
         unit="case",
     ):
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if not quality.passed:
+            continue
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
         estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
         if not np.isfinite(estimated_tf):
@@ -295,6 +307,30 @@ def iter_selected_cases(case_iter, selected_case_ids: set[int]):
         yield metadata, case_df
         if yielded == selected_case_ids:
             return
+
+
+def summary_row_passes_quality(summary_row: dict, params: dict) -> bool:
+    """Apply the analysis quality gate to a TVD summary row."""
+    quality_pass = summary_row.get("analysis_quality_pass", True)
+    if isinstance(quality_pass, str):
+        quality_pass = quality_pass.strip().lower() in {"1", "true", "yes"}
+    if not bool(quality_pass):
+        return False
+
+    quality_cfg = params.get("quality_control", {})
+    max_abs_slope = quality_cfg.get("max_abs_diffractive_phase_slope_cycles_per_s")
+    if max_abs_slope is not None:
+        slope = abs(float(summary_row.get("diffractive_phase_slope_cycles_per_s") or 0.0))
+        if slope > float(max_abs_slope):
+            return False
+
+    max_span = quality_cfg.get("max_diffractive_phase_span_cycles")
+    if max_span is not None:
+        span = float(summary_row.get("diffractive_phase_span_cycles") or 0.0)
+        if span > float(max_span):
+            return False
+
+    return True
 
 
 def validate_selected_cases(rows: list[dict], selected_case_ids: set[int], label: str) -> None:

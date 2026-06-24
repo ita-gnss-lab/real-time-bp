@@ -44,6 +44,7 @@ stages:
       - real_time_bp/utils/parallel.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
+      - real_time_bp/utils/quality.py
       - data/raw/backpropagation
       - results/csv/01_dataset
     params:
@@ -51,6 +52,7 @@ stages:
       - runtime
       - constants
       - experiments
+      - quality_control
       - tvd
     outs:
       - results/csv/02_cycle_slips/tvd_cycle_slip_events.csv
@@ -75,6 +77,7 @@ stages:
       - real_time_bp/utils/parallel.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
+      - real_time_bp/utils/quality.py
       - data/raw/backpropagation
       - results/csv/01_dataset
     params:
@@ -82,6 +85,7 @@ stages:
       - runtime
       - constants
       - experiments
+      - quality_control
       - tvd
     outs:
       - results/csv/03_filter_bank/filter_bank_score_curves.csv
@@ -117,6 +121,7 @@ stages:
       - real_time_bp/utils/parallel.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
+      - real_time_bp/utils/quality.py
       - data/raw/backpropagation
       - results/csv/01_dataset
       - results/csv/03_filter_bank/filter_bank_estimates.csv
@@ -125,7 +130,24 @@ stages:
       - runtime
       - constants
       - experiments
-      - near_real_time
+      - near_real_time.var_order_min
+      - near_real_time.var_order_max
+      - near_real_time.practical_fft_m
+      - near_real_time.practical_latency_samples
+      - near_real_time.residual_doppler_error_hz_min
+      - near_real_time.residual_doppler_error_hz_max
+      - near_real_time.residual_doppler_error_count
+      - near_real_time.var_test_alpha
+      - near_real_time.var_whiteness_test_lags
+      - near_real_time.var_diagnostic_whiteness_lags
+      - near_real_time.var_diagnostic_plot_whiteness_lag
+      - near_real_time.var_forecast_horizons_samples
+      - near_real_time.var_forecast_eval_samples
+      - near_real_time.diagnostic_max_cases_per_severity
+      - near_real_time.forecast_example_c_n0_db_hz
+      - near_real_time.forecast_example_block_len
+      - near_real_time.forecast_example_latency_samples
+      - quality_control
       - tvd
     outs:
       - results/csv/04_near_real_time/near_real_time_var_orders.csv
@@ -133,9 +155,45 @@ stages:
       - results/csv/04_near_real_time/near_real_time_var_forecast_utility.csv
       - results/csv/04_near_real_time/near_real_time_practical_metrics.csv
       - results/csv/04_near_real_time/near_real_time_forecast_example.csv
-      - results/csv/04_near_real_time/near_real_time_latency_heatmap.csv
       - results/csv/04_near_real_time/near_real_time_residual_doppler_metrics.csv
       - results/csv/04_near_real_time/near_real_time_var_residual_diagnostics.csv
+
+  near_real_time_heatmap:
+    cmd: uv run python -m real_time_bp.scripts.get_near_real_time_heatmap
+    deps:
+      - real_time_bp/__init__.py
+      - real_time_bp/config.py
+      - real_time_bp/scripts/get_near_real_time_heatmap.py
+      - real_time_bp/scripts/near_real_time/common.py
+      - real_time_bp/scripts/near_real_time/heatmap.py
+      - real_time_bp/utils/stage.py
+      - real_time_bp/methodology/backpropagation.py
+      - real_time_bp/methodology/constants.py
+      - real_time_bp/methodology/filter_bank.py
+      - real_time_bp/methodology/metrics.py
+      - real_time_bp/methodology/near_real_time.py
+      - real_time_bp/methodology/signal_model.py
+      - real_time_bp/utils/io.py
+      - real_time_bp/utils/parallel.py
+      - real_time_bp/utils/params.py
+      - real_time_bp/utils/progress.py
+      - real_time_bp/utils/quality.py
+      - real_time_bp/utils/representatives.py
+      - data/raw/backpropagation
+      - results/csv/03_filter_bank/filter_bank_estimates.csv
+    params:
+      - dataset
+      - runtime
+      - constants
+      - experiments
+      - near_real_time.var_order_min
+      - near_real_time.var_order_max
+      - near_real_time.fft_m_values
+      - near_real_time.heatmap_latency_fractions
+      - quality_control
+    outs:
+      - results/csv/04_near_real_time/near_real_time_latency_heatmap_cases.csv
+      - results/csv/04_near_real_time/near_real_time_latency_heatmap.csv
 
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
@@ -160,6 +218,7 @@ stages:
       - real_time_bp/utils/output_rows.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
+      - real_time_bp/utils/quality.py
       - real_time_bp/utils/representatives.py
       - data/raw/backpropagation
       - results/csv/02_cycle_slips/tvd_cycle_slip_summary.csv
@@ -169,7 +228,12 @@ stages:
       - runtime
       - constants
       - experiments
-      - near_real_time
+      - near_real_time.var_order_min
+      - near_real_time.var_order_max
+      - near_real_time.practical_fft_m
+      - near_real_time.practical_latency_samples
+      - near_real_time.example_ml_configs
+      - quality_control
       - representatives
       - tvd
     outs:

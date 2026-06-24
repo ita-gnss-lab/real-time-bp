@@ -15,12 +15,13 @@ from real_time_bp.scripts.near_real_time.common import (
     near_real_time_residual_grid_hz,
 )
 from real_time_bp.scripts.near_real_time.heatmap import (
-    iter_selected_heatmap_cases,
-    select_heatmap_case_ids,
+    iter_selected_diagnostic_cases,
+    select_diagnostic_case_ids,
 )
 from real_time_bp.scripts.near_real_time.metrics import compute_practical_case
 from real_time_bp.utils.io import iter_case_dataframes
 from real_time_bp.utils.progress import progress_iter
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.stage import case_keys, csv_chunksize_from_params
 
 
@@ -46,7 +47,7 @@ def compute_residual_doppler_metrics(
     """
     rows: list[dict] = []
     selected_case_ids = representative_case_ids or (
-        select_heatmap_case_ids(params, paths) or set()
+        select_diagnostic_case_ids(params, paths) or set()
     )
     if not selected_case_ids:
         return pd.DataFrame()
@@ -58,7 +59,7 @@ def compute_residual_doppler_metrics(
         chunksize=chunksize,
         columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
     )
-    cases = list(iter_selected_heatmap_cases(case_iter, selected_case_ids))
+    cases = list(iter_selected_diagnostic_cases(case_iter, selected_case_ids))
     residual_grid = near_real_time_residual_grid_hz(params)
     for metadata, case_df in progress_iter(
         cases,
@@ -66,6 +67,9 @@ def compute_residual_doppler_metrics(
         total=len(cases),
         unit="case",
     ):
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if not quality.passed:
+            continue
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
         estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
         if not np.isfinite(estimated_tf):
@@ -105,7 +109,7 @@ def compute_var_residual_diagnostics(
         components.
     """
     selected_case_ids = representative_case_ids or (
-        select_heatmap_case_ids(params, paths) or set()
+        select_diagnostic_case_ids(params, paths) or set()
     )
     if not selected_case_ids:
         return pd.DataFrame()
@@ -120,7 +124,10 @@ def compute_var_residual_diagnostics(
     rows: list[dict] = []
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
-    for metadata, case_df in iter_selected_heatmap_cases(case_iter, selected_case_ids):
+    for metadata, case_df in iter_selected_diagnostic_cases(case_iter, selected_case_ids):
+        quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+        if not quality.passed:
+            continue
         signal = estimated_scintillation_signal(case_df, float(wavelength_m))
         n_init = min(int(experiments.get("n_init_samples", 4096)), len(case_df))
         features = np.column_stack([np.real(signal[:n_init]), np.imag(signal[:n_init])])

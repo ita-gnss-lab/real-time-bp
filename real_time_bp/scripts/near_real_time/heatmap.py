@@ -19,17 +19,19 @@ from real_time_bp.methodology.signal_model import (
 )
 from real_time_bp.scripts.near_real_time.common import (
     NEAR_REAL_TIME_TRACKING_COLUMNS,
-    thin_eval_indices,
+    quality_valid_case_ids,
     valid_eval_indices,
 )
 from real_time_bp.utils.io import count_cases, iter_case_dataframes, load_case_index
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import fixed_step_values
 from real_time_bp.utils.progress import progress_iter
+from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.representatives import SEVERITY_ORDER
 from real_time_bp.utils.stage import (
     case_keys,
     csv_chunksize_from_params,
+    is_loss_of_lock,
     optional_int,
     parallel_workers_from_params,
 )
@@ -38,12 +40,13 @@ from real_time_bp.utils.stage import (
 def compute_heatmap(
     params: dict, paths, wavelength_m: float, tf_estimates: dict[int, float]
 ) -> pd.DataFrame:
-    """Compute near-real-time M/L heatmap rows.
+    """Compute full-dataset near-real-time M/L heatmap rows.
 
     Main paper:
-        Results Figure 11 evaluates FFT length M and latency L. For each M,
-        the valid latency domain is 0 <= L <= M-M_c-1, producing the
-        triangular heatmap domain.
+        Results Figure 11 evaluates FFT length M and latency L over all
+        accepted cases and all valid time samples. For each M, the valid
+        latency domain is 0 <= L <= M-M_c-1, producing the triangular heatmap
+        domain.
 
     Args:
         params: Parsed `params.yaml` dictionary.
@@ -52,29 +55,25 @@ def compute_heatmap(
         tf_estimates: Fresnel-time estimates keyed by tracking case id.
 
     Returns:
-        DataFrame of phase RMSE and cycle-slip metrics for each M/L cell.
+        Per-case DataFrame of phase RMSE and cycle-slip metrics for each M/L
+        cell.
     """
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
     rows: list[dict] = []
-    selected_case_ids = select_heatmap_case_ids(params, paths)
     m_grid = _m_grid_from_params(near_cfg)
     latency_fractions = _latency_fractions_from_params(near_cfg)
-    heatmap_eval_samples = max(int(near_cfg.get("heatmap_eval_samples", 32)), 1)
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
-    total_cases = (
-        len(selected_case_ids)
-        if selected_case_ids is not None
-        else count_cases(paths, severities=experiments.get("severities"))
-    )
+    total_cases = count_cases(paths, severities=experiments.get("severities"))
     heatmap_cells_per_case = _heatmap_cell_count(m_grid, latency_fractions)
+    _log_heatmap_plan(total_cases, m_grid, latency_fractions)
     logger.info(
-        "Heatmap grid: {} selected case(s), {} FFT lengths, {} M/L cells per case, {} eval sample(s) per cell",
+        "Full heatmap grid: {} raw case(s), {} FFT lengths, {} M/L cells per accepted case, no time thinning, {} worker(s)",
         total_cases,
         len(m_grid),
         heatmap_cells_per_case,
-        heatmap_eval_samples,
+        workers,
     )
     case_iter = iter_case_dataframes(
         paths,
@@ -83,7 +82,6 @@ def compute_heatmap(
         chunksize=chunksize,
         columns=NEAR_REAL_TIME_TRACKING_COLUMNS,
     )
-    selected_case_iter = iter_selected_heatmap_cases(case_iter, selected_case_ids)
     task_iter = (
         (
             metadata,
@@ -93,9 +91,8 @@ def compute_heatmap(
             tf_estimates,
             m_grid,
             latency_fractions,
-            heatmap_eval_samples,
         )
-        for metadata, case_df in selected_case_iter
+        for metadata, case_df in case_iter
     )
     result_iter = ordered_parallel_map(
         _compute_heatmap_case_task,
@@ -112,8 +109,35 @@ def compute_heatmap(
     return pd.DataFrame(rows)
 
 
+def aggregate_heatmap_cases(case_rows: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate per-case heatmap rows into the figure heatmap table.
+
+    Args:
+        case_rows: Per-case rows returned by `compute_heatmap`.
+
+    Returns:
+        DataFrame with one row per severity, M, and latency cell.
+    """
+    if case_rows.empty:
+        return pd.DataFrame()
+    group_cols = ["severity", "block_len", "latency_samples", "latency_fraction"]
+    return (
+        case_rows.groupby(group_cols, dropna=False)
+        .agg(
+            refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "median"),
+            mean_refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "mean"),
+            median_refractive_phase_rmse_rad=("refractive_phase_rmse_rad", "median"),
+            cycle_slips_per_minute=("cycle_slips_per_minute", "median"),
+            mean_cycle_slips_per_minute=("cycle_slips_per_minute", "mean"),
+            median_cycle_slips_per_minute=("cycle_slips_per_minute", "median"),
+            n_cases=("tracking_case_id", "nunique"),
+        )
+        .reset_index()
+    )
+
+
 def _compute_heatmap_case_task(task: tuple) -> list[dict]:
-    """Compute all heatmap cells for one selected tracking case.
+    """Compute all heatmap cells for one accepted tracking case.
 
     Main paper:
         Methodology Eq. (20) fits one VAR model per case and reuses it across
@@ -128,13 +152,15 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
         tf_estimates,
         m_grid,
         latency_fractions,
-        heatmap_eval_samples,
     ) = task
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
     case_id = int(metadata.get("tracking_case_id", 0) or 0)
     estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
     if not np.isfinite(estimated_tf):
+        return []
+    quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
+    if not quality.passed:
         return []
     sample_interval_s = estimate_sample_interval_s(case_df)
     signal = estimated_scintillation_signal(case_df, float(wavelength_m))
@@ -146,11 +172,17 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
         int(near_cfg.get("var_order_min", 1)),
         int(near_cfg.get("var_order_max", 24)),
     )
+    logger.info(
+        "Heatmap case {} {}: {} cells, {} sliding-BP evaluation(s)",
+        case_id,
+        metadata.get("severity"),
+        _heatmap_cell_count(m_grid, latency_fractions),
+        _case_heatmap_evaluation_count(len(case_df), m_grid, latency_fractions),
+    )
     rows = []
     for block_len in m_grid:
         future_context = int(block_len) - int(block_len) // 2 - 1
         eval_indices = valid_eval_indices(len(case_df), int(block_len))
-        eval_indices = thin_eval_indices(eval_indices, max_points=int(heatmap_eval_samples))
         for latency_fraction, latency in _latency_grid(future_context, latency_fractions):
             sliding = sliding_window_bp_with_var_forecast(
                 signal,
@@ -184,12 +216,53 @@ def _compute_heatmap_case_task(task: tuple) -> list[dict]:
     return rows
 
 
-def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
-    """Select representative case ids for the heatmap stage.
+def _log_heatmap_plan(
+    total_cases: int,
+    m_grid: np.ndarray,
+    latency_fractions: np.ndarray,
+) -> None:
+    """Log the heatmap workload before the expensive stage begins."""
+    logger.info("Heatmap M grid: {}", [int(value) for value in m_grid])
+    logger.info(
+        "Heatmap latency fractions: {}",
+        [round(float(value), 3) for value in latency_fractions],
+    )
+    logger.info(
+        "Heatmap upper-bound workload: {} raw case(s), {} cell(s)/case",
+        total_cases,
+        _heatmap_cell_count(m_grid, latency_fractions),
+    )
+    for block_len in m_grid:
+        future_context = int(block_len) - int(block_len) // 2 - 1
+        latency_count = len(_latency_grid(future_context, latency_fractions))
+        logger.info(
+            "Heatmap M={}: {} latency cell(s); valid samples depend on each case length",
+            int(block_len),
+            latency_count,
+        )
+
+
+def _case_heatmap_evaluation_count(
+    n_samples: int,
+    m_grid: np.ndarray,
+    latency_fractions: np.ndarray,
+) -> int:
+    """Count sliding-BP evaluations for one case over the full heatmap grid."""
+    total = 0
+    for block_len in m_grid:
+        future_context = int(block_len) - int(block_len) // 2 - 1
+        total += valid_eval_indices(int(n_samples), int(block_len)).size * len(
+            _latency_grid(future_context, latency_fractions)
+        )
+    return int(total)
+
+
+def select_diagnostic_case_ids(params: dict, paths) -> set[int] | None:
+    """Select representative case ids for lightweight diagnostic stages.
 
     Main paper:
-        Results Figure 11 is a latency/M diagnostic, not a carrier-to-noise
-        sweep, so representative C/N0 cases are selected per severity.
+        Residual-Doppler and VAR diagnostics are supporting checks, so a small
+        number of representative C/N0 cases are selected per severity.
 
     Args:
         params: Parsed `params.yaml` dictionary.
@@ -200,7 +273,7 @@ def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
         cases.
     """
     near_cfg = params.get("near_real_time", {})
-    max_cases = optional_int(near_cfg.get("heatmap_max_cases_per_severity"))
+    max_cases = optional_int(near_cfg.get("diagnostic_max_cases_per_severity", 1))
     if max_cases is None:
         return None
 
@@ -209,6 +282,10 @@ def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
     if case_index.empty or "tracking_case_id" not in case_index.columns:
         return None
     case_index = case_index.drop_duplicates("tracking_case_id").copy()
+    if "loss_of_lock" in case_index.columns:
+        case_index = case_index[
+            ~case_index.apply(lambda row: is_loss_of_lock(row.to_dict()), axis=1)
+        ]
     severity_filter = set(experiments.get("severities") or [])
     if severity_filter and "severity" in case_index.columns:
         case_index = case_index[case_index["severity"].astype(str).isin(severity_filter)]
@@ -234,12 +311,20 @@ def select_heatmap_case_ids(params: dict, paths) -> set[int] | None:
         if column in case_index.columns
     ]
     case_index = case_index.sort_values(sort_columns)
+    valid_case_ids = quality_valid_case_ids(
+        params,
+        paths,
+        set(case_index["tracking_case_id"].astype(int).to_numpy()),
+    )
+    case_index = case_index[case_index["tracking_case_id"].astype(int).isin(valid_case_ids)]
+    if case_index.empty:
+        return set()
     selected = case_index.groupby("severity", dropna=False, sort=False).head(max_cases)
     return {int(case_id) for case_id in selected["tracking_case_id"].to_numpy()}
 
 
-def iter_selected_heatmap_cases(case_iter, selected_case_ids: set[int] | None):
-    """Yield only heatmap-selected cases from a case iterator.
+def iter_selected_diagnostic_cases(case_iter, selected_case_ids: set[int] | None):
+    """Yield only selected diagnostic cases from a case iterator.
 
     Args:
         case_iter: Iterator over `(metadata, case_df)` tracking cases.
