@@ -1,8 +1,7 @@
-"""Generate TVD cycle-slip CSV outputs for the paper results."""
+"""TVD cycle-slip helpers used by representative and sliding result stages."""
 
 from __future__ import annotations
 
-from loguru import logger
 import numpy as np
 import pandas as pd
 
@@ -14,24 +13,10 @@ from real_time_bp.methodology.signal_model import (
     true_scintillation_phase_rad,
 )
 from real_time_bp.methodology.tvd import detect_cycle_slips_from_tvd
-from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.output_rows import sampled_time_rows
-from real_time_bp.utils.parallel import ordered_parallel_map
-from real_time_bp.utils.params import load_params
-from real_time_bp.utils.progress import configure_logging, progress_iter
 from real_time_bp.utils.quality import evaluate_analysis_quality
 from real_time_bp.utils.representatives import SEVERITY_ORDER, sort_by_severity
-from real_time_bp.utils.stage import (
-    BufferedCsvWriter,
-    case_keys,
-    csv_chunksize_from_params,
-    csv_stage_dir,
-    csv_write_batch_rows_from_params,
-    is_loss_of_lock,
-    l1_wavelength_from_params,
-    optional_int,
-    parallel_workers_from_params,
-)
+from real_time_bp.utils.stage import case_keys, is_loss_of_lock
 
 TVD_TRACKING_COLUMNS = {
     "estimated_scintillation_phase_m",
@@ -40,44 +25,6 @@ TVD_TRACKING_COLUMNS = {
     "tracked_intensity",
     "true_refractive_phase_m",
 }
-EVENT_COLUMNS = [
-    "tracking_case_id",
-    "example_idx",
-    "c_n0_idx",
-    "severity",
-    "frequency",
-    "svid",
-    "input_c_n0_db_hz",
-    "init_doppler_error_hz",
-    "loss_of_lock",
-    "true_fresnel_time_scale_s",
-    "sample_index",
-    "time_sec",
-    "integer_cycle_bias",
-    "integer_cycle_jump",
-    "is_fade_minimum",
-    "intensity_db",
-]
-SUMMARY_COLUMNS = [
-    "tracking_case_id",
-    "example_idx",
-    "c_n0_idx",
-    "severity",
-    "frequency",
-    "svid",
-    "input_c_n0_db_hz",
-    "init_doppler_error_hz",
-    "loss_of_lock",
-    "true_fresnel_time_scale_s",
-    "n_samples",
-    "n_fade_minima",
-    "n_tvd_cycle_slips",
-    "cycle_slips_per_minute",
-    "diffractive_phase_slope_cycles_per_s",
-    "diffractive_phase_span_cycles",
-    "analysis_quality_pass",
-    "analysis_quality_reason",
-]
 TRACE_COLUMNS = [
     "tracking_case_id",
     "example_idx",
@@ -116,155 +63,51 @@ REPRESENTATIVE_COLUMNS = [
     "diffractive_phase_span_cycles",
 ]
 STAGE_DIR = "02_cycle_slips"
-EVENTS_CSV = "tvd_cycle_slip_events.csv"
-SUMMARY_CSV = "tvd_cycle_slip_summary.csv"
 REPRESENTATIVES_CSV = "tvd_representative_cases.csv"
 TRACES_CSV = "tvd_example_traces.csv"
 
 
-def main() -> None:
-    """Run the TVD cycle-slip stage and write events, summaries, and traces.
-
-    Main paper:
-        Methodology Section II.2 isolates TVD cycle-slip detection from later
-        BP/filter-bank experiments. Results CSVs are exported separately so
-        slips and traces can be plotted or processed independently.
-    """
-    configure_logging()
-    logger.info("Starting TVD cycle-slip stage")
-    params = load_params()
-    experiments = params.get("experiments", {})
-    tvd_cfg = params.get("tvd", {})
-    out_dir = csv_stage_dir(STAGE_DIR)
-    paths = find_dataset_paths(params)
-    logger.info("Using dataset root {}", paths.root)
-    wavelength_m = l1_wavelength_from_params(params)
-    max_cases = optional_int(experiments.get("max_cases_per_condition"))
-    chunksize = csv_chunksize_from_params(params)
-    write_batch_rows = csv_write_batch_rows_from_params(params)
-    workers = parallel_workers_from_params(params)
-    logger.info("Using {} parallel worker(s)", workers)
-    total_cases = count_cases(
-        paths,
-        severities=experiments.get("severities"),
-        max_cases_per_condition=max_cases,
-    )
-
-    case_iter = iter_case_dataframes(
-        paths,
-        severities=experiments.get("severities"),
-        max_cases_per_condition=max_cases,
-        chunksize=chunksize,
-        columns=TVD_TRACKING_COLUMNS,
-    )
-    task_iter = _iter_tvd_tasks(case_iter, params, tvd_cfg, wavelength_m)
-    result_iter = ordered_parallel_map(
-        _compute_tvd_case,
-        task_iter,
-        workers=workers,
-    )
-    with (
-        BufferedCsvWriter(
-            out_dir / EVENTS_CSV,
-            columns=EVENT_COLUMNS,
-            batch_rows=write_batch_rows,
-        ) as event_writer,
-        BufferedCsvWriter(
-            out_dir / SUMMARY_CSV,
-            columns=SUMMARY_COLUMNS,
-            batch_rows=write_batch_rows,
-        ) as summary_writer,
-    ):
-        for result in progress_iter(
-            result_iter,
-            desc="TVD cases",
-            total=total_cases,
-            unit="case",
-        ):
-            summary_row = result["summary_row"]
-            if summary_row is None:
-                continue
-            event_writer.write_many(result["event_rows"])
-            summary_writer.write(summary_row)
-    logger.info("Finished TVD cycle-slip stage")
-
-
-def _iter_tvd_tasks(case_iter, params: dict, tvd_cfg: dict, wavelength_m: float):
-    for metadata, case_df in case_iter:
-        yield (
-            metadata,
-            case_df,
-            params,
-            wavelength_m,
-            float(tvd_cfg.get("fade_threshold_db", -15.0)),
-            float(tvd_cfg.get("allowed_jump_weight", 1.0)),
-            float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        )
-
-
-def _compute_tvd_case(task: tuple) -> dict[str, object]:
-    """Compute TVD cycle-slip events and one summary row for a case.
+def compute_tvd_summary_row(
+    metadata: dict,
+    case_df,
+    params: dict,
+    wavelength_m: float,
+    threshold_db: float,
+    allowed_jump_weight: float,
+    blocked_jump_weight: float,
+) -> dict | None:
+    """Compute one tracked-phase TVD cycle-slip summary row.
 
     Main paper:
         Methodology Eq. (12) supplies the LOS-corrected phase before removing
         the known refractive component for the diffractive-phase TVD input.
         Methodology Section II.2 and Breitsch et al. (2020, Section III.C)
         define slips as nonzero first differences of the rounded TVD
-        cycle-bias staircase. Results Section III.2 uses the summary row for
-        CS/min, phase-slope diagnostics, and per-condition aggregation.
+        cycle-bias staircase. Representative figures use this summary only to
+        choose examples; all-case CS/min is computed in the sliding stage.
     """
-    (
-        metadata,
-        case_df,
-        params,
-        wavelength_m,
-        threshold_db,
-        allowed_jump_weight,
-        blocked_jump_weight,
-    ) = task
     quality = evaluate_analysis_quality(metadata, case_df, params, float(wavelength_m))
     if not quality.passed:
-        return {
-            "event_rows": [],
-            "summary_row": None,
-        }
+        return None
     time_sec = case_df["time_sec"].to_numpy(dtype=float)
     intensity_db = detrended_intensity_db(case_df)
     estimated_phase = estimated_scintillation_phase_rad(case_df, float(wavelength_m))
     true_refractive = true_refractive_phase_rad(case_df, float(wavelength_m))
     diffractive_phase = estimated_phase - true_refractive
-    fade_minima, integer_cycle_bias, cycle_slip_indices = detect_cycle_slips_from_tvd(
+    fade_minima, _integer_cycle_bias, cycle_slip_indices = detect_cycle_slips_from_tvd(
         diffractive_phase,
         intensity_db,
         float(threshold_db),
         float(allowed_jump_weight),
         float(blocked_jump_weight),
     )
-    fade_minima_set = set(int(x) for x in fade_minima)
     metadata_keys = case_keys(
         metadata,
         include_loss_of_lock=True,
         include_true_fresnel_time=True,
     )
-
-    event_rows = []
-    for idx in cycle_slip_indices:
-        jump_to_idx = min(int(idx) + 1, integer_cycle_bias.size - 1)
-        integer_cycle_jump = int(integer_cycle_bias[jump_to_idx] - integer_cycle_bias[int(idx)])
-        event_rows.append(
-            {
-                **metadata_keys,
-                "sample_index": int(idx),
-                "time_sec": float(time_sec[idx]),
-                "integer_cycle_bias": int(integer_cycle_bias[jump_to_idx]),
-                "integer_cycle_jump": integer_cycle_jump,
-                "is_fade_minimum": int(idx) in fade_minima_set,
-                "intensity_db": float(intensity_db[idx]),
-            }
-        )
-
     duration_min = (time_sec[-1] - time_sec[0]) / 60.0 if time_sec.size > 1 else np.nan
-    summary_row = {
+    return {
         **metadata_keys,
         "n_samples": int(case_df.shape[0]),
         "n_fade_minima": int(fade_minima.size),
@@ -277,39 +120,6 @@ def _compute_tvd_case(task: tuple) -> dict[str, object]:
         "analysis_quality_pass": quality.passed,
         "analysis_quality_reason": quality.reason,
     }
-
-    return {
-        "event_rows": event_rows,
-        "summary_row": summary_row,
-    }
-
-
-def _iter_representative_tvd_traces(
-    case_iter,
-    selected_case_ids: set[int],
-    wavelength_m: float,
-    n_init: int,
-    threshold_db: float,
-    allowed_jump_weight: float,
-    blocked_jump_weight: float,
-):
-    yielded: set[int] = set()
-    for metadata, case_df in case_iter:
-        case_id = int(metadata.get("tracking_case_id", 0) or 0)
-        if case_id not in selected_case_ids:
-            continue
-        yield _compute_tvd_trace_rows(
-            metadata,
-            case_df,
-            wavelength_m,
-            n_init,
-            threshold_db,
-            allowed_jump_weight,
-            blocked_jump_weight,
-        )
-        yielded.add(case_id)
-        if yielded == selected_case_ids:
-            return
 
 
 def _compute_tvd_trace_rows(
@@ -396,7 +206,3 @@ def _representative_rows(
         )
         rows.append(row)
     return sort_by_severity(pd.DataFrame(rows)).to_dict("records") if rows else []
-
-
-if __name__ == "__main__":
-    main()

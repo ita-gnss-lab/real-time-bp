@@ -6,7 +6,7 @@ from loguru import logger
 import numpy as np
 import pandas as pd
 
-from real_time_bp.scripts.get_cycle_slip_results import (
+from real_time_bp.scripts.cycle_slips import (
     REPRESENTATIVE_COLUMNS,
     REPRESENTATIVES_CSV,
     TRACE_COLUMNS,
@@ -15,11 +15,11 @@ from real_time_bp.scripts.get_cycle_slip_results import (
     _compute_tvd_trace_rows,
     _representative_rank_key,
     _representative_rows,
+    compute_tvd_summary_row,
 )
-from real_time_bp.scripts.get_cycle_slip_results import (
+from real_time_bp.scripts.cycle_slips import (
     STAGE_DIR as CYCLE_STAGE_DIR,
 )
-from real_time_bp.scripts.get_cycle_slip_results import SUMMARY_CSV as TVD_SUMMARY_CSV
 from real_time_bp.scripts.get_filter_bank_results import (
     FILTER_BANK_TRACKING_COLUMNS,
     _compute_case_filter_bank,
@@ -36,7 +36,7 @@ from real_time_bp.scripts.sliding.common import (
     load_amplitude_tf_estimates,
 )
 from real_time_bp.scripts.sliding.metrics import compute_practical_case
-from real_time_bp.utils.io import find_dataset_paths, iter_case_dataframes
+from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
 from real_time_bp.utils.quality import evaluate_analysis_quality
@@ -44,6 +44,7 @@ from real_time_bp.utils.stage import (
     csv_chunksize_from_params,
     csv_stage_dir,
     l1_wavelength_from_params,
+    optional_int,
     tf_candidate_grid,
     write_csv,
     write_sorted_csv,
@@ -69,7 +70,7 @@ def main() -> None:
     paths = find_dataset_paths(params)
     wavelength_m = l1_wavelength_from_params(params)
     chunksize = csv_chunksize_from_params(params)
-    selected_rows = select_representative_rows(params)
+    selected_rows = select_representative_rows(params, paths, wavelength_m, chunksize)
     selected_case_ids = {
         int(row["tracking_case_id"])
         for row in selected_rows
@@ -135,15 +136,45 @@ def main() -> None:
     )
 
 
-def select_representative_rows(params: dict) -> list[dict]:
-    """Select representative cases from the already generated TVD summary table."""
-    summary_path = csv_stage_dir(CYCLE_STAGE_DIR) / TVD_SUMMARY_CSV
-    if not summary_path.exists() or summary_path.stat().st_size == 0:
-        return []
-    summary_df = pd.read_csv(summary_path)
+def select_representative_rows(
+    params: dict,
+    paths,
+    wavelength_m: float,
+    chunksize: int,
+) -> list[dict]:
+    """Select representative cases from on-the-fly TVD summary rows."""
+    experiments = params.get("experiments", {})
+    tvd_cfg = params.get("tvd", {})
+    max_cases = optional_int(experiments.get("max_cases_per_condition"))
+    total_cases = count_cases(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+    )
+    case_iter = iter_case_dataframes(
+        paths,
+        severities=experiments.get("severities"),
+        max_cases_per_condition=max_cases,
+        chunksize=chunksize,
+        columns=TVD_TRACKING_COLUMNS,
+    )
     candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]] = {}
-    for summary_row in summary_df.to_dict("records"):
-        if not summary_row_passes_quality(summary_row, params):
+    for metadata, case_df in progress_iter(
+        case_iter,
+        desc="representative TVD summary cases",
+        total=total_cases,
+        unit="case",
+    ):
+        summary_row = compute_tvd_summary_row(
+            metadata,
+            case_df,
+            params,
+            float(wavelength_m),
+            float(tvd_cfg.get("fade_threshold_db", -10.0)),
+            float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+            float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
+        )
+        if summary_row is None:
             continue
         rank_key = _representative_rank_key(summary_row)
         if rank_key is None:
@@ -309,30 +340,6 @@ def iter_selected_cases(case_iter, selected_case_ids: set[int]):
             return
 
 
-def summary_row_passes_quality(summary_row: dict, params: dict) -> bool:
-    """Apply the analysis quality gate to a TVD summary row."""
-    quality_pass = summary_row.get("analysis_quality_pass", True)
-    if isinstance(quality_pass, str):
-        quality_pass = quality_pass.strip().lower() in {"1", "true", "yes"}
-    if not bool(quality_pass):
-        return False
-
-    quality_cfg = params.get("quality_control", {})
-    max_abs_slope = quality_cfg.get("max_abs_diffractive_phase_slope_cycles_per_s")
-    if max_abs_slope is not None:
-        slope = abs(float(summary_row.get("diffractive_phase_slope_cycles_per_s") or 0.0))
-        if slope > float(max_abs_slope):
-            return False
-
-    max_span = quality_cfg.get("max_diffractive_phase_span_cycles")
-    if max_span is not None:
-        span = float(summary_row.get("diffractive_phase_span_cycles") or 0.0)
-        if span > float(max_span):
-            return False
-
-    return True
-
-
 def validate_selected_cases(rows: list[dict], selected_case_ids: set[int], label: str) -> None:
     """Raise a clear error when representative ids are absent from raw data."""
     present = {
@@ -344,7 +351,7 @@ def validate_selected_cases(rows: list[dict], selected_case_ids: set[int], label
     if missing:
         raise RuntimeError(
             f"Missing representative case ids in {label}: {missing}. "
-            "Regenerate the core CSV stages once so the TVD summary matches the current dataset."
+            "Check the representative rank and the current analysis quality filters."
         )
 
 

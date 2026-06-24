@@ -35,13 +35,12 @@ def plot_sliding() -> None:
     out_dir = figure_stage_dir("04_sliding")
     var_orders = read_csv("04_sliding/sliding_var_orders.csv")
     practical = read_csv("04_sliding/sliding_practical_metrics.csv")
-    tvd_summary = read_csv("02_cycle_slips/tvd_cycle_slip_summary.csv")
     heatmap = read_csv("04_sliding/sliding_latency_heatmap.csv")
     phase = read_csv("04_sliding/sliding_phase_example.csv")
     forecast = read_csv("04_sliding/sliding_forecast_example.csv")
 
     _plot_var_orders(var_orders, out_dir / "var_order_histogram.pdf")
-    _plot_practical_metrics(practical, tvd_summary, out_dir / "batch_vs_sliding_metrics.pdf")
+    _plot_practical_metrics(practical, out_dir / "batch_vs_sliding_metrics.pdf")
     _plot_latency_heatmap(heatmap, out_dir / "latency_heatmap.pdf")
     _plot_phase_example(phase, out_dir / "sliding_phase_example.pdf")
     _plot_forecast_example(forecast, out_dir / "var_forecast_example.pdf")
@@ -78,7 +77,7 @@ def _plot_var_orders(df: pd.DataFrame, path: Path) -> None:
     save_figure(fig, path)
 
 
-def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) -> None:
+def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
     """Plot batch BP versus sliding BP practical metrics.
 
     Main paper:
@@ -114,6 +113,11 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         "sliding_cs_per_min",
         "sliding_cycle_slips_per_minute",
     )
+    tracked_cs_col = _optional_column(
+        df,
+        "tracked_cs_per_min",
+        "tracked_cycle_slips_per_minute",
+    )
     n_value = (
         int(df["n_init_samples"].dropna().iloc[0])
         if "n_init_samples" in df and df["n_init_samples"].notna().any()
@@ -133,6 +137,8 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
         metric_cols = [batch_col, sliding_col, batch_cs_col, sliding_cs_col]
         if tracked_col is not None:
             metric_cols.append(tracked_col)
+        if tracked_cs_col is not None:
+            metric_cols.append(tracked_cs_col)
         clean = _mean_by_c_n0(group, metric_cols)
         color = SEVERITY_COLORS.get(str(severity), COLORS["sliding"])
         if tracked_col is not None:
@@ -172,13 +178,10 @@ def _plot_practical_metrics(df: pd.DataFrame, tvd_df: pd.DataFrame, path: Path) 
             color=color,
             label=rf"{severity} sliding BP",
         )
-    if not tvd_df.empty and "cycle_slips_per_minute" in tvd_df.columns:
-        for severity, group in severity_groups(tvd_df):
-            clean = _mean_by_c_n0(group, ["cycle_slips_per_minute"])
-            color = SEVERITY_COLORS.get(str(severity), COLORS["tvd"])
+        if tracked_cs_col is not None:
             axes[1].plot(
                 clean["input_c_n0_db_hz"],
-                clean["cycle_slips_per_minute"],
+                clean[tracked_cs_col],
                 color=color,
                 linestyle=":",
                 linewidth=1.2,

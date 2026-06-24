@@ -87,7 +87,7 @@ def sort_by_severity(df: pd.DataFrame, extra_columns: list[str] | None = None) -
 
 
 def load_representative_case_ids(csv_dir: Path = CSV_RESULTS_DIR) -> dict[str, int]:
-    """Load representative TVD case ids selected by the cycle-slip stage.
+    """Load representative TVD case ids selected by the representative stage.
 
     Args:
         csv_dir: Root CSV results directory.

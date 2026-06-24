@@ -28,36 +28,6 @@ stages:
     outs:
       - results/csv/01_dataset
 
-  cycle_slip_results:
-    cmd: uv run python -m real_time_bp.scripts.get_cycle_slip_results
-    deps:
-      - real_time_bp/__init__.py
-      - real_time_bp/config.py
-      - real_time_bp/scripts/get_cycle_slip_results.py
-      - real_time_bp/utils/stage.py
-      - real_time_bp/methodology/constants.py
-      - real_time_bp/methodology/signal_model.py
-      - real_time_bp/methodology/tvd.py
-      - real_time_bp/utils/representatives.py
-      - real_time_bp/utils/io.py
-      - real_time_bp/utils/output_rows.py
-      - real_time_bp/utils/parallel.py
-      - real_time_bp/utils/params.py
-      - real_time_bp/utils/progress.py
-      - real_time_bp/utils/quality.py
-      - data/raw/backpropagation
-      - results/csv/01_dataset
-    params:
-      - dataset
-      - runtime
-      - constants
-      - experiments
-      - quality_control
-      - tvd
-    outs:
-      - results/csv/02_cycle_slips/tvd_cycle_slip_events.csv
-      - results/csv/02_cycle_slips/tvd_cycle_slip_summary.csv
-
   filter_bank_results:
     cmd: uv run python -m real_time_bp.scripts.get_filter_bank_results
     deps:
@@ -204,7 +174,7 @@ stages:
       - real_time_bp/__init__.py
       - real_time_bp/config.py
       - real_time_bp/scripts/get_representative_results.py
-      - real_time_bp/scripts/get_cycle_slip_results.py
+      - real_time_bp/scripts/cycle_slips.py
       - real_time_bp/scripts/get_filter_bank_results.py
       - real_time_bp/scripts/sliding/common.py
       - real_time_bp/scripts/sliding/examples.py
@@ -224,7 +194,6 @@ stages:
       - real_time_bp/utils/quality.py
       - real_time_bp/utils/representatives.py
       - data/raw/backpropagation
-      - results/csv/02_cycle_slips/tvd_cycle_slip_summary.csv
       - results/csv/03_filter_bank/filter_bank_estimates.csv
     params:
       - dataset
@@ -263,7 +232,8 @@ stages:
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
       - results/csv/01_dataset
-      - results/csv/02_cycle_slips
+      - results/csv/02_cycle_slips/tvd_representative_cases.csv
+      - results/csv/02_cycle_slips/tvd_example_traces.csv
       - results/csv/03_filter_bank
       - results/csv/04_sliding/sliding_var_orders.csv
       - results/csv/04_sliding/sliding_practical_metrics.csv

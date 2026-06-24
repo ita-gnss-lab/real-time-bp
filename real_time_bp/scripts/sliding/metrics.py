@@ -339,6 +339,15 @@ def compute_practical_case(
         float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
         mask=eval_mask,
     )
+    tracked_slips, tracked_slips_per_min = tvd_cycle_slips_per_minute(
+        aligned_estimated_scintillation_phase - true_phase,
+        intensity_db,
+        time_sec,
+        float(tvd_cfg.get("fade_threshold_db", -10.0)),
+        float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+        float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
+        mask=eval_mask,
+    )
     batch_mrmse_phi_r = phase_rmse_rad(true_phase[eval_mask], batch_phase[eval_mask])
     sliding_mrmse_phi_r = phase_rmse_rad(
         true_phase[eval_mask],
@@ -367,6 +376,9 @@ def compute_practical_case(
         "sliding_cycle_slip_count": sliding_slips,
         "sliding_cs_per_min": sliding_slips_per_min,
         "sliding_cycle_slips_per_minute": sliding_slips_per_min,
+        "tracked_cycle_slip_count": tracked_slips,
+        "tracked_cs_per_min": tracked_slips_per_min,
+        "tracked_cycle_slips_per_minute": tracked_slips_per_min,
     }
     var_order_row = {
         **case_keys(metadata),
