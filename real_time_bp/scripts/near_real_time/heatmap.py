@@ -7,16 +7,18 @@ import numpy as np
 import pandas as pd
 
 from real_time_bp.methodology.backpropagation import median_align_phase, unwrap_phase
-from real_time_bp.methodology.metrics import cycle_slips_per_minute, phase_rmse_rad
+from real_time_bp.methodology.metrics import phase_rmse_rad
 from real_time_bp.methodology.near_real_time import (
     select_var_order_bic,
     sliding_window_bp_with_var_forecast,
 )
 from real_time_bp.methodology.signal_model import (
+    detrended_intensity_db,
     estimate_sample_interval_s,
     estimated_scintillation_signal,
     true_refractive_phase_rad,
 )
+from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute
 from real_time_bp.scripts.near_real_time.common import (
     NEAR_REAL_TIME_TRACKING_COLUMNS,
     quality_valid_case_ids,
@@ -163,6 +165,7 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
     ) = task
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
+    tvd_cfg = params.get("tvd", {})
     case_id = int(metadata.get("tracking_case_id", 0) or 0)
     estimated_tf = tf_estimates.get(case_id, float(metadata.get("rhof_veff_ratio", np.nan)))
     if not np.isfinite(estimated_tf):
@@ -171,6 +174,8 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
     if not quality.passed:
         return []
     sample_interval_s = estimate_sample_interval_s(case_df)
+    intensity_db = detrended_intensity_db(case_df)
+    time_sec = case_df["time_sec"].to_numpy(dtype=float)
     signal = estimated_scintillation_signal(case_df, float(wavelength_m))
     true_phase = true_refractive_phase_rad(case_df, float(wavelength_m))
     n_init = min(int(experiments.get("n_init_samples", 4096)), len(case_df))
@@ -205,10 +210,14 @@ def _compute_heatmap_block_task(task: tuple) -> list[dict]:
         mask = np.zeros(len(case_df), dtype=bool)
         mask[eval_indices] = True
         mask[:n_init] = False
-        slip_count, slips_per_min = cycle_slips_per_minute(
-            true_phase[mask],
-            phase[mask],
-            sample_interval_s,
+        slip_count, slips_per_min = tvd_cycle_slips_per_minute(
+            phase - true_phase,
+            intensity_db,
+            time_sec,
+            float(tvd_cfg.get("fade_threshold_db", -10.0)),
+            float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+            float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
+            mask=mask,
         )
         rows.append(
             {

@@ -17,7 +17,6 @@ from real_time_bp.methodology.filter_bank import (
     select_fresnel_time_estimate,
 )
 from real_time_bp.methodology.metrics import (
-    cycle_slips_per_minute,
     mae,
     mape,
     phase_rmse_rad,
@@ -32,7 +31,7 @@ from real_time_bp.methodology.signal_model import (
     true_refractive_phase_rad,
     true_scintillation_phase_rad,
 )
-from real_time_bp.methodology.tvd import tvd_integer_bias
+from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute, tvd_integer_bias
 from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.output_rows import sampled_time_rows
 from real_time_bp.utils.parallel import ordered_parallel_map
@@ -260,10 +259,15 @@ def _compute_case_filter_bank(
     backpropagated = batch_backpropagate(signal, sample_interval_s, estimated_tf)
     phase = median_align_phase(unwrap_phase(backpropagated), true_phase, n_init)
     phase_rmse = phase_rmse_rad(true_phase[n_init:], phase[n_init:])
-    slip_count, slips_per_min = cycle_slips_per_minute(
-        true_phase,
-        phase,
-        sample_interval_s,
+    intensity_db = detrended_intensity_db(case_df)
+    tvd_cfg = params.get("tvd", {})
+    slip_count, slips_per_min = tvd_cycle_slips_per_minute(
+        phase - true_phase,
+        intensity_db,
+        case_df["time_sec"].to_numpy(dtype=float),
+        float(tvd_cfg.get("fade_threshold_db", -10.0)),
+        float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+        float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
         start_index=n_init,
     )
     downstream_rows.append(
@@ -277,8 +281,6 @@ def _compute_case_filter_bank(
         }
     )
     if include_trace:
-        intensity_db = detrended_intensity_db(case_df)
-        tvd_cfg = params.get("tvd", {})
         # Plot-only convention: align the displayed tracked scintillation phase
         # to truth with the same post-N_init median rule used for BP estimates.
         # This only removes the arbitrary phase constant.

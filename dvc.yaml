@@ -173,6 +173,7 @@ stages:
       - real_time_bp/methodology/metrics.py
       - real_time_bp/methodology/near_real_time.py
       - real_time_bp/methodology/signal_model.py
+      - real_time_bp/methodology/tvd.py
       - real_time_bp/utils/io.py
       - real_time_bp/utils/parallel.py
       - real_time_bp/utils/params.py
@@ -192,6 +193,7 @@ stages:
       - near_real_time.heatmap_latency_fractions
       - near_real_time.heatmap_cases_per_severity
       - quality_control
+      - tvd
     outs:
       - results/csv/04_near_real_time/near_real_time_latency_heatmap_cases.csv
       - results/csv/04_near_real_time/near_real_time_latency_heatmap.csv

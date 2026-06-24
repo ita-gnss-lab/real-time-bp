@@ -227,3 +227,60 @@ def tvd_integer_bias(
         blocked_jump_weight,
     )
     return integer_cycle_bias
+
+
+def tvd_cycle_slips_per_minute(
+    phase_error_rad: np.ndarray,
+    intensity_db: np.ndarray,
+    time_sec: np.ndarray,
+    threshold_db: float,
+    allowed_jump_weight: float,
+    blocked_jump_weight: float,
+    *,
+    start_index: int = 0,
+    mask: np.ndarray | None = None,
+) -> tuple[int, float]:
+    """Detect TVD cycle slips and normalize the count by evaluated duration.
+
+    This applies the same cycle-slip definition used in the main paper,
+    Methodology Section II.2, to any phase-error trace: weighted TVD estimates
+    an integer cycle-bias staircase, and nonzero first differences of that
+    staircase are counted as cycle slips. This helper is used for tracked,
+    batch-BP, and near-real-time BP phase errors so reported CS/min values use
+    the same detector everywhere.
+
+    Args:
+        phase_error_rad: Phase error trace in radians, such as
+            `hat_phi_s - phi_r` or `hat_phi_r - phi_r`.
+        intensity_db: Detrended tracked intensity in dB, used to locate fade
+            minima where TVD jumps are allowed.
+        time_sec: Sample times in seconds.
+        threshold_db: Fade threshold in dB.
+        allowed_jump_weight: TVD penalty used at fade minima.
+        blocked_jump_weight: TVD penalty used outside fade minima.
+        start_index: First sample eligible for the count.
+        mask: Optional boolean mask selecting evaluated samples.
+
+    Returns:
+        Pair containing TVD-detected slip count and slips per minute.
+    """
+    phase_error = np.asarray(phase_error_rad, dtype=float)
+    intensity = np.asarray(intensity_db, dtype=float)
+    time = np.asarray(time_sec, dtype=float)
+    keep = np.isfinite(phase_error) & np.isfinite(intensity) & np.isfinite(time)
+    if mask is not None:
+        keep &= np.asarray(mask, dtype=bool)
+    keep[: int(start_index)] = False
+    if np.sum(keep) < 2:
+        return 0, float("nan")
+
+    _, _, cycle_slip_indices = detect_cycle_slips_from_tvd(
+        phase_error[keep],
+        intensity[keep],
+        threshold_db,
+        allowed_jump_weight,
+        blocked_jump_weight,
+    )
+    duration_min = float((time[keep][-1] - time[keep][0]) / 60.0)
+    count = int(cycle_slip_indices.size)
+    return count, float(count / duration_min) if duration_min > 0.0 else float("nan")

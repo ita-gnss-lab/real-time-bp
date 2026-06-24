@@ -10,12 +10,13 @@ from real_time_bp.methodology.backpropagation import (
     median_align_phase,
     unwrap_phase,
 )
-from real_time_bp.methodology.metrics import cycle_slips_per_minute, phase_rmse_rad
+from real_time_bp.methodology.metrics import phase_rmse_rad
 from real_time_bp.methodology.near_real_time import (
     select_var_order_bic,
     sliding_window_bp_with_var_forecast,
 )
 from real_time_bp.methodology.signal_model import (
+    detrended_intensity_db,
     estimate_sample_interval_s,
     estimated_scintillation_phase_rad,
     estimated_scintillation_signal,
@@ -23,6 +24,7 @@ from real_time_bp.methodology.signal_model import (
     true_scintillation_phase_rad,
     true_scintillation_signal,
 )
+from real_time_bp.methodology.tvd import tvd_cycle_slips_per_minute
 from real_time_bp.scripts.near_real_time.common import quality_valid_case_ids, valid_eval_indices
 from real_time_bp.scripts.near_real_time.examples import (
     forecast_example_rows,
@@ -273,6 +275,7 @@ def compute_practical_case(
     """
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
+    tvd_cfg = params.get("tvd", {})
     n_init = int(experiments.get("n_init_samples", 4096))
     block_len = int(near_cfg.get("practical_fft_m", 8192))
     latency = int(near_cfg.get("practical_latency_samples", block_len // 2 - 1))
@@ -284,6 +287,8 @@ def compute_practical_case(
         wavelength_m,
         residual_doppler_error_hz,
     )
+    intensity_db = detrended_intensity_db(case_df)
+    time_sec = case_df["time_sec"].to_numpy(dtype=float)
     true_scintillation_phase = true_scintillation_phase_rad(case_df, wavelength_m)
     # Plot-only convention: align the displayed tracked scintillation phase to
     # truth with the same post-N_init median rule used for BP phase estimates.
@@ -316,15 +321,23 @@ def compute_practical_case(
     eval_mask = np.zeros(len(case_df), dtype=bool)
     eval_mask[eval_indices] = True
     eval_mask[:n_init] = False
-    batch_slips, batch_slips_per_min = cycle_slips_per_minute(
-        true_phase[eval_mask],
-        batch_phase[eval_mask],
-        sample_interval_s,
+    batch_slips, batch_slips_per_min = tvd_cycle_slips_per_minute(
+        batch_phase - true_phase,
+        intensity_db,
+        time_sec,
+        float(tvd_cfg.get("fade_threshold_db", -10.0)),
+        float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+        float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
+        mask=eval_mask,
     )
-    sliding_slips, sliding_slips_per_min = cycle_slips_per_minute(
-        true_phase[eval_mask],
-        sliding_phase[eval_mask],
-        sample_interval_s,
+    sliding_slips, sliding_slips_per_min = tvd_cycle_slips_per_minute(
+        sliding_phase - true_phase,
+        intensity_db,
+        time_sec,
+        float(tvd_cfg.get("fade_threshold_db", -10.0)),
+        float(tvd_cfg.get("allowed_jump_weight", 1.0)),
+        float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
+        mask=eval_mask,
     )
     practical_row = {
         **case_keys(metadata),

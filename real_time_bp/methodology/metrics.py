@@ -140,35 +140,3 @@ def phase_rmse_rad(reference_phase_rad: np.ndarray, estimate_phase_rad: np.ndarr
     if not np.any(mask):
         return float("nan")
     return rmse(wrap_to_pi(estimate_phase_rad[mask] - reference_phase_rad[mask]))
-
-
-def cycle_slips_per_minute(
-    reference_phase_rad: np.ndarray,
-    estimate_phase_rad: np.ndarray,
-    sample_interval_s: float,
-    start_index: int = 0,
-) -> tuple[int, float]:
-    """Count integer-cycle phase jumps and normalize them by duration.
-
-    Main paper:
-        Results Section III.2 defines CS/min over the samples after N_init.
-        Jumps are changes in the rounded integer phase error.
-
-    Args:
-        reference_phase_rad: Reference phase trace in radians.
-        estimate_phase_rad: Estimated phase trace in radians.
-        sample_interval_s: Sample spacing in seconds.
-        start_index: First sample included in the cycle-slip count.
-
-    Returns:
-        Pair containing the integer-cycle jump count and slips per minute.
-    """
-    reference = np.asarray(reference_phase_rad, dtype=float)[start_index:]
-    estimate = np.asarray(estimate_phase_rad, dtype=float)[start_index:]
-    mask = finite_mask(reference, estimate)
-    if np.sum(mask) < 2:
-        return 0, float("nan")
-    integer_cycle_error = np.rint((estimate[mask] - reference[mask]) / (2.0 * np.pi)).astype(int)
-    count = int(np.count_nonzero(np.diff(integer_cycle_error)))
-    duration_min = float(np.sum(mask) * sample_interval_s / 60.0)
-    return count, float(count / duration_min) if duration_min > 0.0 else float("nan")
