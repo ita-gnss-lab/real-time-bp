@@ -22,6 +22,7 @@ from real_time_bp.utils.plot_style import (
     CONFIG_CMAP,
     N_INIT_LINESTYLES,
     SEVERITY_COLORS,
+    figsize_cm,
     grid_figure_size,
 )
 from real_time_bp.utils.representatives import SEVERITY_ORDER, ordered_severities, severity_groups
@@ -76,14 +77,26 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         placeholder(path, "No filter-bank score data")
         return
     severities = ordered_severities(scores)
+    if not severities:
+        placeholder(path, "No configured severity score data")
+        return
+    configured_n_init = {
+        int(value)
+        for value in load_params().get("experiments", {}).get("score_curve_n_init_samples", [])
+    }
     fig, axes = plt.subplots(
         1,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 1, panel_height_cm=5.7),
+        len(severities) + 1,
+        figsize=figsize_cm(9.0 * len(severities) + 3.6, 5.7),
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.42]},
         sharey=False,
+        constrained_layout=True,
     )
     axes = np.atleast_1d(axes)
-    for ax, severity in zip(axes, severities):
+    plot_axes = axes[:-1]
+    legend_ax = axes[-1]
+    legend_ax.set_axis_off()
+    for ax, severity in zip(plot_axes, severities, strict=True):
         group = scores[scores["severity"].eq(severity)]
         if "residual_doppler_error_hz" in group.columns:
             residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
@@ -110,6 +123,12 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         n_init_values = sorted(
             pd.to_numeric(group["n_init_samples"], errors="coerce").dropna().unique()
         )
+        if configured_n_init:
+            n_init_values = [value for value in n_init_values if int(value) in configured_n_init]
+        if not n_init_values:
+            ax.text(0.5, 0.5, "No configured N_init score data", ha="center", va="center")
+            ax.set_axis_off()
+            continue
         n_init_cmap = plt.get_cmap(CONFIG_CMAP)
         n_init_colors = n_init_cmap(np.linspace(0.18, 0.86, max(len(n_init_values), 1)))
         for style_idx, n_init in enumerate(n_init_values):
@@ -155,11 +174,11 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
                 )
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
-    axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
-    handles, labels = _unique_legend_items(axes)
+    plot_axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
+    handles, labels = _unique_legend_items(plot_axes)
     if handles:
-        axes[-1].legend(handles, labels, loc="best")
-    save_figure(fig, path)
+        legend_ax.legend(handles, labels, loc="center left")
+    save_figure(fig, path, tight=False)
 
 
 def _draw_tf_error_boxplot(estimates: pd.DataFrame, ax, n_init_samples: int) -> None:

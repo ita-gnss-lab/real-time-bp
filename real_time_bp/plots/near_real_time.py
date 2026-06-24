@@ -17,8 +17,8 @@ from real_time_bp.utils.plot_style import (
     FONT_SIZES_PT,
     HEATMAP_CMAP,
     SEVERITY_COLORS,
+    figsize_cm,
     figure_size,
-    grid_figure_size,
 )
 from real_time_bp.utils.representatives import SEVERITY_ORDER, severity_groups
 from real_time_bp.utils.stage import figure_stage_dir
@@ -284,14 +284,19 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
     ]
     fig, axes = plt.subplots(
         1,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 1, panel_height_cm=6.0),
+        len(severities) + 1,
+        figsize=figsize_cm(8.4 * len(severities) + 3.8, 6.0),
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.45]},
         sharex=False,
+        constrained_layout=True,
     )
     axes = np.atleast_1d(axes)
+    plot_axes = axes[:-1]
+    legend_ax = axes[-1]
+    legend_ax.set_axis_off()
     legend_title = None
     for col, severity in enumerate(severities):
-        ax = axes[col]
+        ax = plot_axes[col]
         severity_group = df[df["severity"].astype(str).eq(severity)]
         case_id = severity_group["tracking_case_id"].iloc[0]
         severity_group = severity_group[severity_group["tracking_case_id"].eq(case_id)]
@@ -347,13 +352,6 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 linewidth=1.0,
                 label=r"$\hat{\phi}_s-\phi_r$",
             )
-        ax.plot(
-            base["time_sec"],
-            batch_error_cycles,
-            color=COLORS["truth"],
-            linewidth=1.1,
-            label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
-        )
         near_col = column(
             severity_group,
             "near_real_time_refractive_phase_error_rad",
@@ -377,15 +375,23 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 linewidth=1.0,
                 label=rf"$\hat{{\phi}}_{{r,\mathrm{{sliding}}}}-\phi_r$, $L={int(latency)}$",
             )
+        ax.plot(
+            base["time_sec"],
+            batch_error_cycles,
+            color=COLORS["truth"],
+            linewidth=1.1,
+            zorder=6,
+            label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
+        )
         if finite_times:
             ax.set_xlim(min(finite_times), max(finite_times))
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel("Time [sec]")
         ax.set_ylabel("Phase differences [cycles]")
-    handles, labels = _unique_legend_items(axes)
+    handles, labels = _unique_legend_items(plot_axes)
     if handles:
-        axes[-1].legend(handles, labels, loc="best", title=legend_title)
-    save_figure(fig, path)
+        legend_ax.legend(handles, labels, loc="center left", title=legend_title)
+    save_figure(fig, path, tight=False)
 
 
 def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
@@ -409,15 +415,21 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
     severities = [severity for severity in ["weak", "strong"] if severity in set(SEVERITY_ORDER)]
     fig, axes = plt.subplots(
         2,
-        len(severities),
-        figsize=grid_figure_size(len(severities), 2, panel_width_cm=8.0, panel_height_cm=4.1),
+        len(severities) + 1,
+        figsize=figsize_cm(8.0 * len(severities) + 3.8, 8.2),
+        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.48]},
         sharex=True,
+        constrained_layout=True,
         squeeze=False,
     )
+    plot_axes = axes[:, :-1]
+    legend_axes = axes[:, -1]
+    for ax in legend_axes:
+        ax.set_axis_off()
     for col, severity in enumerate(severities):
         group = _forecast_case_group(df[df["severity"].astype(str).eq(severity)])
         if group.empty:
-            for ax in axes[:, col]:
+            for ax in plot_axes[:, col]:
                 ax.text(0.5, 0.5, f"No {severity} forecast data", ha="center", va="center")
                 ax.set_axis_off()
             continue
@@ -437,11 +449,11 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             truth = truth[truth[x_col].between(start_s, end_s)]
             group = group[group[x_col].between(start_s, end_s)]
         if truth.empty or group.empty:
-            for ax in axes[:, col]:
+            for ax in plot_axes[:, col]:
                 ax.text(0.5, 0.5, "No samples in zoom window", ha="center", va="center")
                 ax.set_axis_off()
             continue
-        axes[0, col].plot(
+        plot_axes[0, col].plot(
             truth[x_col],
             truth["true_real"],
             color=COLORS["truth"],
@@ -449,7 +461,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             zorder=5,
             label=r"$\mathrm{Re}\{\psi\}$",
         )
-        axes[1, col].plot(
+        plot_axes[1, col].plot(
             truth[x_col],
             truth["true_imag"],
             color=COLORS["truth"],
@@ -458,7 +470,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             label=r"$\mathrm{Im}\{\psi\}$",
         )
         if "estimated_real" in truth.columns:
-            axes[0, col].plot(
+            plot_axes[0, col].plot(
                 truth[x_col],
                 truth["estimated_real"],
                 color=COLORS["estimated_signal"],
@@ -466,7 +478,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
                 alpha=0.8,
                 label=r"$\mathrm{Re}\{\hat{\psi}\}$",
             )
-            axes[1, col].plot(
+            plot_axes[1, col].plot(
                 truth[x_col],
                 truth["estimated_imag"],
                 color=COLORS["estimated_signal"],
@@ -480,7 +492,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         for color, (latency, latency_group) in zip(forecast_colors, forecast_groups):
             forecast_real = latency_group.dropna(subset=["forecast_real"])
             forecast_imag = latency_group.dropna(subset=["forecast_imag"])
-            axes[0, col].plot(
+            plot_axes[0, col].plot(
                 forecast_real[x_col],
                 forecast_real["forecast_real"],
                 "--",
@@ -488,7 +500,7 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
                 linewidth=1.5,
                 label=rf"Forecast, $L={int(latency)}$",
             )
-            axes[1, col].plot(
+            plot_axes[1, col].plot(
                 forecast_imag[x_col],
                 forecast_imag["forecast_imag"],
                 "--",
@@ -498,19 +510,22 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
             )
             start = _forecast_start(latency_group)
             if start is not None:
-                for ax in axes[:, col]:
+                for ax in plot_axes[:, col]:
                     ax.axvline(start, color=color, linestyle=":", linewidth=1.0, alpha=0.8)
-        axes[0, col].set_title(str(severity).capitalize())
-        for ax in axes[:, col]:
+        plot_axes[0, col].set_title(str(severity).capitalize())
+        for ax in plot_axes[:, col]:
             ax.set_xlabel("Time [sec]" if x_col == "time_sec" else "Sample")
             if x_col == "time_sec":
                 ax.set_xlim(start_s, end_s)
-            ax.legend(loc="upper right")
-    for ax in axes[0, :]:
+    for ax in plot_axes[0, :]:
         ax.set_ylabel("Real part")
-    for ax in axes[1, :]:
+    for ax in plot_axes[1, :]:
         ax.set_ylabel("Imaginary part")
-    save_figure(fig, path)
+    for row, legend_ax in enumerate(legend_axes):
+        handles, labels = _unique_legend_items(plot_axes[row, :])
+        if handles:
+            legend_ax.legend(handles, labels, loc="center left")
+    save_figure(fig, path, tight=False)
 
 
 def _forecast_case_group(df: pd.DataFrame) -> pd.DataFrame:

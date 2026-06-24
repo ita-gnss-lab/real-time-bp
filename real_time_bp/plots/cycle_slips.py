@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from real_time_bp.methodology.tvd import find_fade_minima
 from real_time_bp.plots.common import (
     amplitude_only,
     column,
@@ -74,6 +75,7 @@ def plot_cycle_slips() -> None:
             axes[0, col].set_title(f"{severity.capitalize()} - no loss of lock")
             continue
         group = group[group["tracking_case_id"].eq(group["tracking_case_id"].iloc[0])]
+        group = group.sort_values("sample_index" if "sample_index" in group else "time_sec")
         intensity_ax = axes[0, col]
         phase_ax = axes[1, col]
         error_ax = axes[2, col]
@@ -97,21 +99,28 @@ def plot_cycle_slips() -> None:
             linewidth=1.1,
             label="Detrended intensity",
         )
-        minima = group[bool_series(group["is_fade_minimum"])]
-        intensity_ax.scatter(
-            minima["time_sec"],
-            minima["intensity_db"],
-            color=COLORS["truth"],
-            s=9,
-            alpha=0.65,
-            label="Fade minima",
-        )
         intensity_ax.axhline(
             threshold_db,
             color=COLORS["neutral"],
             linestyle=":",
             linewidth=1,
             label=rf"{abs(threshold_db):g} dB threshold",
+        )
+        minima = group.iloc[
+            find_fade_minima(
+                pd.to_numeric(group["intensity_db"], errors="coerce").to_numpy(),
+                threshold_db,
+            )
+        ]
+        intensity_ax.scatter(
+            minima["time_sec"],
+            minima["intensity_db"],
+            color=COLORS["neutral"],
+            edgecolor=COLORS["truth"],
+            linewidth=0.35,
+            s=12,
+            zorder=5,
+            label="Fade minima",
         )
         intensity_ax.set_title(str(severity).capitalize())
         intensity_ax.set_ylabel("Intensity [dB]")
@@ -196,16 +205,6 @@ def plot_cycle_slips() -> None:
                 linewidth=1,
                 label=r"$\phi_s-\phi_r$",
             )
-        integer_cycle_bias = _zero_reference_cycles(group["integer_cycle_bias"])
-        error_ax.step(
-            group["time_sec"],
-            integer_cycle_bias,
-            where="mid",
-            color=COLORS["tvd"],
-            linestyle=":",
-            linewidth=1.2,
-            label=r"TVD $\hat{\phi}_s-\phi_r$",
-        )
         if not filter_group.empty:
             batch_error_col = column(
                 filter_group,
@@ -223,6 +222,17 @@ def plot_cycle_slips() -> None:
                 linewidth=1.0,
                 label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
             )
+        integer_cycle_bias = _zero_reference_cycles(group["integer_cycle_bias"])
+        error_ax.step(
+            group["time_sec"],
+            integer_cycle_bias,
+            where="mid",
+            color=COLORS["tvd"],
+            linestyle=":",
+            linewidth=1.2,
+            zorder=6,
+            label=r"TVD $\hat{\phi}_s-\phi_r$",
+        )
         error_ax.set_xlabel("Time [sec]")
         error_ax.set_ylabel("Phase differences [cycles]")
     for row in range(axes.shape[0]):
