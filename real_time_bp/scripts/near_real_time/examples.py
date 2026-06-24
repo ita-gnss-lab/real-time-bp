@@ -191,6 +191,11 @@ def forecast_example_rows(
     if future_context <= 0:
         return []
     features = np.column_stack([np.real(signal), np.imag(signal)])
+    time_sec = np.asarray(case_df["time_sec"], dtype=float)
+    sample_interval_s = float(np.nanmedian(np.diff(time_sec))) if time_sec.size > 1 else 1.0
+    if not np.isfinite(sample_interval_s) or sample_interval_s <= 0.0:
+        sample_interval_s = 1.0
+    context_samples = max(int(round(10.0 / sample_interval_s)), 0)
     rows = []
     for latency in _forecast_example_latencies(future_context, latencies):
         observed_stop = center + int(latency)
@@ -200,31 +205,31 @@ def forecast_example_rows(
             continue
         history = features[observed_stop + 1 - k_ar : observed_stop + 1]
         forecast = var_result.forecast(history, steps=forecast_steps)
-        future_axis = np.arange(observed_stop + 1, observed_stop + 1 + forecast_steps)
-        true_tail = true_signal[future_axis]
-        estimated_tail = signal[future_axis]
         forecast_start_sample = int(observed_stop + 1)
-        forecast_start_time = float(case_df["time_sec"].iloc[forecast_start_sample])
-        for sample, true_value, estimated_value, forecast_value in zip(
-            future_axis,
-            true_tail,
-            estimated_tail,
-            forecast[:, 0] + 1j * forecast[:, 1],
-        ):
+        forecast_start_time = float(time_sec[forecast_start_sample])
+        display_start = max(0, forecast_start_sample - context_samples)
+        display_stop = forecast_start_sample + forecast_steps
+        for sample in range(display_start, display_stop):
+            forecast_idx = sample - forecast_start_sample
+            forecast_value = (
+                forecast[forecast_idx, 0] + 1j * forecast[forecast_idx, 1]
+                if forecast_idx >= 0
+                else np.nan + 1j * np.nan
+            )
             rows.append(
                 {
                     **case_keys(metadata),
                     "target_sample_index": int(center),
                     "sample_index": int(sample),
-                    "time_sec": float(case_df["time_sec"].iloc[int(sample)]),
+                    "time_sec": float(time_sec[int(sample)]),
                     "block_len": int(block_len),
                     "latency_samples": int(latency),
                     "forecast_start_sample_index": forecast_start_sample,
                     "forecast_start_time_sec": forecast_start_time,
-                    "true_real": float(np.real(true_value)),
-                    "true_imag": float(np.imag(true_value)),
-                    "estimated_real": float(np.real(estimated_value)),
-                    "estimated_imag": float(np.imag(estimated_value)),
+                    "true_real": float(np.real(true_signal[int(sample)])),
+                    "true_imag": float(np.imag(true_signal[int(sample)])),
+                    "estimated_real": float(np.real(signal[int(sample)])),
+                    "estimated_imag": float(np.imag(signal[int(sample)])),
                     "forecast_real": float(np.real(forecast_value)),
                     "forecast_imag": float(np.imag(forecast_value)),
                 }

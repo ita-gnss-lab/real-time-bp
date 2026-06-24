@@ -111,6 +111,6 @@ near_real_time:
 plots:
   csv_dir: results/csv
   figures_dir: results/figures
-  forecast_zoom_start_s:
-  forecast_zoom_end_s:
+  forecast_zoom_start_s: 310.0
+  forecast_zoom_end_s: 370.0
   forecast_zoom_latency_samples: 0

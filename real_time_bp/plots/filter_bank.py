@@ -78,15 +78,12 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
     severities = ordered_severities(scores)
     fig, axes = plt.subplots(
         1,
-        len(severities) + 1,
-        figsize=grid_figure_size(len(severities) + 1, 1, panel_height_cm=5.7),
+        len(severities),
+        figsize=grid_figure_size(len(severities), 1, panel_height_cm=5.7),
         sharey=False,
-        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.7]},
     )
     axes = np.atleast_1d(axes)
-    legend_ax = axes[-1]
-    legend_ax.set_axis_off()
-    for ax, severity in zip(axes[:-1], severities):
+    for ax, severity in zip(axes, severities):
         group = scores[scores["severity"].eq(severity)]
         if "residual_doppler_error_hz" in group.columns:
             residual = pd.to_numeric(group["residual_doppler_error_hz"], errors="coerce")
@@ -159,9 +156,9 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
     axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
-    handles, labels = _unique_legend_items(axes[:-1])
+    handles, labels = _unique_legend_items(axes)
     if handles:
-        legend_ax.legend(handles, labels, loc="center left")
+        axes[-1].legend(handles, labels, loc="best")
     save_figure(fig, path)
 
 

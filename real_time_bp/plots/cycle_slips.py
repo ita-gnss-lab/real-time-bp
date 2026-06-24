@@ -6,7 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from real_time_bp.plots.common import amplitude_only, column, placeholder, read_csv, remove_figure
+from real_time_bp.plots.common import (
+    amplitude_only,
+    column,
+    placeholder,
+    read_csv,
+    remove_figure,
+    save_figure,
+)
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.plot_style import COLORS, grid_figure_size
 from real_time_bp.utils.representatives import SEVERITY_ORDER, bool_series
@@ -43,16 +50,12 @@ def plot_cycle_slips() -> None:
         return
     fig, axes = plt.subplots(
         3,
-        len(severities) + 1,
-        figsize=grid_figure_size(len(severities) + 1, 3, panel_height_cm=5.0),
+        len(severities),
+        figsize=grid_figure_size(len(severities), 3, panel_height_cm=5.0),
         sharex="col",
         constrained_layout=True,
-        gridspec_kw={"width_ratios": [1.0] * len(severities) + [0.65]},
         squeeze=False,
     )
-    legend_axes = axes[:, -1]
-    for ax in legend_axes:
-        ax.set_axis_off()
     intensity_values = pd.to_numeric(trace["intensity_db"], errors="coerce").dropna()
     if intensity_values.empty:
         intensity_ylim = None
@@ -68,7 +71,7 @@ def plot_cycle_slips() -> None:
             for ax in axes[:, col]:
                 ax.text(0.5, 0.5, "No no-lock example", ha="center", va="center")
                 ax.set_axis_off()
-            axes[0, col].set_title(f"{severity} - no loss of lock")
+            axes[0, col].set_title(f"{severity.capitalize()} - no loss of lock")
             continue
         group = group[group["tracking_case_id"].eq(group["tracking_case_id"].iloc[0])]
         intensity_ax = axes[0, col]
@@ -110,7 +113,7 @@ def plot_cycle_slips() -> None:
             linewidth=1,
             label=rf"{abs(threshold_db):g} dB threshold",
         )
-        intensity_ax.set_title(str(severity))
+        intensity_ax.set_title(str(severity).capitalize())
         intensity_ax.set_ylabel("Intensity [dB]")
         if intensity_ylim is not None:
             intensity_ax.set_ylim(*intensity_ylim)
@@ -212,7 +215,7 @@ def plot_cycle_slips() -> None:
             batch_error = filter_group[batch_error_col]
             if batch_error_col == "phase_error_rad":
                 batch_error = batch_error / (2.0 * np.pi)
-            batch_error = _zero_reference_cycles(batch_error)
+            batch_error = _median_reference_cycles(batch_error)
             error_ax.plot(
                 filter_group["time_sec"],
                 batch_error,
@@ -220,28 +223,14 @@ def plot_cycle_slips() -> None:
                 linewidth=1.0,
                 label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
             )
-            if "batch_integer_cycle_bias" in filter_group:
-                batch_integer_cycle_bias = _zero_reference_cycles(
-                    filter_group["batch_integer_cycle_bias"]
-                )
-                error_ax.step(
-                    filter_group["time_sec"],
-                    batch_integer_cycle_bias,
-                    where="mid",
-                    color=COLORS["tvd"],
-                    linestyle=":",
-                    linewidth=1.2,
-                    label=r"TVD $\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
-                )
         error_ax.set_xlabel("Time [sec]")
         error_ax.set_ylabel("Phase differences [cycles]")
-    for row, legend_ax in enumerate(legend_axes):
-        handles, labels = _unique_legend_items(axes[row, :-1])
+    for row in range(axes.shape[0]):
+        handles, labels = _unique_legend_items(axes[row, :])
         if handles:
-            legend_ax.legend(handles, labels, loc="center left")
-    fig.savefig(out_dir / "tvd_example_traces.pdf")
+            axes[row, -1].legend(handles, labels, loc="best")
+    save_figure(fig, out_dir / "tvd_example_traces.pdf", tight=False)
     remove_figure(filter_dir / "representative_phase_retrieval.pdf")
-    plt.close(fig)
 
 
 def _zero_reference_cycles(values) -> np.ndarray:
@@ -249,6 +238,14 @@ def _zero_reference_cycles(values) -> np.ndarray:
     finite = np.isfinite(series)
     if np.any(finite):
         series = series - series[np.flatnonzero(finite)[0]]
+    return series
+
+
+def _median_reference_cycles(values) -> np.ndarray:
+    series = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+    finite = np.isfinite(series)
+    if np.any(finite):
+        series = series - float(np.nanmedian(series[finite]))
     return series
 
 

@@ -39,7 +39,7 @@ def iter_practical_tasks(
     wavelength_m: float,
     tf_estimates: dict[int, float],
     representative_case_ids: set[int],
-    forecast_case_id: int | None = None,
+    forecast_case_id: int | dict[str, int] | None = None,
 ):
     """Yield practical BP tasks with representative-example flags.
 
@@ -55,15 +55,16 @@ def iter_practical_tasks(
         wavelength_m: Carrier wavelength in meters.
         tf_estimates: Fresnel-time estimates keyed by tracking case id.
         representative_case_ids: Explicit case ids selected for examples.
-        forecast_case_id: Optional preselected tracking case id for the VAR
-            forecast example.
+        forecast_case_id: Optional preselected tracking case id, or one case id
+            per severity, for the VAR forecast example.
 
     Yields:
         Tuples consumed by `compute_practical_case_task`.
     """
     experiments = params.get("experiments", {})
     phase_example_severities: set[str] = set()
-    forecast_example_selected = False
+    forecast_example_severities: set[str] = set()
+    forecast_case_ids = forecast_case_id if isinstance(forecast_case_id, dict) else {}
     near_cfg = params.get("near_real_time", {})
     forecast_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
     for metadata, case_df in case_iter:
@@ -78,9 +79,11 @@ def iter_practical_tasks(
             phase_example_severities.add(severity)
 
         include_forecast_example = False
-        if forecast_case_id is not None:
+        if forecast_case_ids:
+            include_forecast_example = case_id == int(forecast_case_ids.get(severity, -1))
+        elif forecast_case_id is not None:
             include_forecast_example = case_id == int(forecast_case_id)
-        elif not forecast_example_selected and severity == "strong":
+        elif severity not in forecast_example_severities:
             c_n0 = metadata.get("input_c_n0_db_hz")
             if forecast_c_n0 is None:
                 include_forecast_example = is_representative_case(metadata, experiments)
@@ -89,7 +92,7 @@ def iter_practical_tasks(
                     np.isfinite(c_n0) and float(c_n0) >= float(forecast_c_n0)
                 )
         if include_forecast_example:
-            forecast_example_selected = True
+            forecast_example_severities.add(severity)
         yield (
             metadata,
             case_df,
@@ -101,12 +104,12 @@ def iter_practical_tasks(
         )
 
 
-def select_forecast_case_id(
+def select_forecast_case_ids(
     params: dict,
     paths,
     tf_estimates: dict[int, float] | None = None,
-) -> int | None:
-    """Select a robust strong-scintillation case for the VAR forecast figure.
+) -> dict[str, int]:
+    """Select robust weak and strong cases for the VAR forecast figure.
 
     Args:
         params: Parsed `params.yaml` dictionary.
@@ -114,24 +117,24 @@ def select_forecast_case_id(
         tf_estimates: Optional Fresnel-time estimates keyed by tracking case id.
 
     Returns:
-        Tracking case id closest to the requested forecast C/N0, or None when
-        the dataset index is unavailable.
+        Mapping from severity name to tracking case id closest to the
+        requested forecast C/N0.
     """
     case_index = load_case_index(paths)
     if case_index.empty or "tracking_case_id" not in case_index.columns:
-        return None
+        return {}
     experiments = params.get("experiments", {})
     near_cfg = params.get("near_real_time", {})
     candidates = case_index.drop_duplicates("tracking_case_id").copy()
-    severity_filter = set(experiments.get("severities") or [])
+    severity_filter = [str(value) for value in (experiments.get("severities") or [])]
+    if not severity_filter:
+        severity_filter = list(SEVERITY_ORDER)
     if severity_filter and "severity" in candidates:
         candidates = candidates[candidates["severity"].astype(str).isin(severity_filter)]
     if tf_estimates:
         candidates = candidates[candidates["tracking_case_id"].astype(int).isin(set(tf_estimates))]
-    if "severity" in candidates and candidates["severity"].astype(str).eq("strong").any():
-        candidates = candidates[candidates["severity"].astype(str).eq("strong")]
     if candidates.empty:
-        return None
+        return {}
     target_c_n0 = near_cfg.get("forecast_example_c_n0_db_hz")
     if target_c_n0 is not None and "input_c_n0_db_hz" in candidates:
         candidates["_c_n0_distance"] = (
@@ -139,19 +142,40 @@ def select_forecast_case_id(
         ).abs()
     else:
         candidates["_c_n0_distance"] = 0.0
-    if "severity" in candidates:
-        candidates["_severity_order"] = pd.Categorical(
-            candidates["severity"].astype(str),
-            categories=SEVERITY_ORDER,
-            ordered=True,
-        )
-    sort_columns = [
-        column
-        for column in ["_severity_order", "_c_n0_distance", "tracking_case_id"]
-        if column in candidates.columns
-    ]
-    selected = candidates.sort_values(sort_columns).iloc[0]
-    return int(selected["tracking_case_id"])
+    selected_case_ids: dict[str, int] = {}
+    for severity in severity_filter:
+        if "severity" in candidates:
+            severity_candidates = candidates[candidates["severity"].astype(str).eq(severity)]
+        else:
+            severity_candidates = candidates
+        if severity_candidates.empty:
+            continue
+        selected = severity_candidates.sort_values(["_c_n0_distance", "tracking_case_id"]).iloc[0]
+        selected_case_ids[str(severity)] = int(selected["tracking_case_id"])
+    return selected_case_ids
+
+
+def select_forecast_case_id(
+    params: dict,
+    paths,
+    tf_estimates: dict[int, float] | None = None,
+) -> int | None:
+    """Return the strong forecast case id for backward-compatible callers.
+
+    Args:
+        params: Parsed `params.yaml` dictionary.
+        paths: Resolved dataset paths.
+        tf_estimates: Optional Fresnel-time estimates keyed by tracking case id.
+
+    Returns:
+        Strong case id when available, otherwise the first selected severity.
+    """
+    selected = select_forecast_case_ids(params, paths, tf_estimates)
+    if not selected:
+        return None
+    if "strong" in selected:
+        return selected["strong"]
+    return next(iter(selected.values()))
 
 
 def compute_practical_case_task(task: tuple) -> dict[str, object] | None:

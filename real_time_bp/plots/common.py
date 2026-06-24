@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import warnings
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -92,6 +93,8 @@ def save_figure(fig, path: Path, *, tight: bool = True) -> None:
         tight: Whether to apply `tight_layout` before saving.
     """
     if tight:
-        fig.tight_layout()
-    fig.savefig(path)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Tight layout not applied.*")
+            fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight", pad_inches=0.0)
     plt.close(fig)

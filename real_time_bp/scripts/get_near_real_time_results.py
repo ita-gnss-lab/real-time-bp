@@ -17,7 +17,7 @@ from real_time_bp.scripts.near_real_time.heatmap import compute_heatmap
 from real_time_bp.scripts.near_real_time.metrics import (
     compute_practical_case_task,
     iter_practical_tasks,
-    select_forecast_case_id,
+    select_forecast_case_ids,
 )
 from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dataframes
 from real_time_bp.utils.parallel import ordered_parallel_map
@@ -65,9 +65,9 @@ def main() -> None:
     chunksize = csv_chunksize_from_params(params)
     tf_estimates = load_amplitude_tf_estimates()
     representative_case_ids = set(load_representative_case_ids().values())
-    forecast_case_id = select_forecast_case_id(params, paths, tf_estimates)
-    if forecast_case_id is not None:
-        logger.info("Using tracking case {} for the VAR forecast example", forecast_case_id)
+    forecast_case_ids = select_forecast_case_ids(params, paths, tf_estimates)
+    if forecast_case_ids:
+        logger.info("Using VAR forecast examples {}", forecast_case_ids)
     workers = parallel_workers_from_params(params)
     logger.info("Using {} parallel worker(s)", workers)
     total_cases = count_cases(
@@ -96,7 +96,7 @@ def main() -> None:
         wavelength_m,
         tf_estimates,
         representative_case_ids,
-        forecast_case_id,
+        forecast_case_ids,
     )
     result_iter = ordered_parallel_map(
         compute_practical_case_task,
