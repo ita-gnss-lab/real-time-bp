@@ -10,16 +10,16 @@ stages:
     outs:
     - path: data/raw/backpropagation
       hash: md5
-      md5: da77e86076fd85e6f9974d2f760103d0.dir
-      size: 4928392382
+      md5: b17c37ad2a3ecff281246888d365c5e5.dir
+      size: 4928392380
       nfiles: 10
   dataset_summary:
     cmd: uv run python -m real_time_bp.scripts.get_dataset_summary
     deps:
     - path: data/raw/backpropagation
       hash: md5
-      md5: 39be6a6322a8f98ac2ce6eda867262a2.dir
-      size: 2340865673
+      md5: b17c37ad2a3ecff281246888d365c5e5.dir
+      size: 4928392380
       nfiles: 10
     - path: real_time_bp/__init__.py
       hash: md5
@@ -43,8 +43,8 @@ stages:
       size: 10941
     - path: real_time_bp/utils/params.py
       hash: md5
-      md5: d0db521576c3bbd5183e942b807a3fdd
-      size: 525
+      md5: 2188cf039dbaab5c07fb1be0f19e8da1
+      size: 1754
     - path: real_time_bp/utils/progress.py
       hash: md5
       md5: f4044f7e36dd369225fd7524c58378af
@@ -68,33 +68,34 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
-          - 512
-          - 1024
-          - 1536
-          - 2048
-          - 4096
-          - 8192
+            min: 512
+            max: 16384
+            step: 512
+          n_init_samples_boxplot: 8192
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 72
           score_curve_n_init_samples:
-          - 512
           - 1024
+          - 2048
           - 4096
           representative_c_n0_db_hz: 35.0
+          representative_case_rank_by_severity:
+            weak: 2
+            strong: 2
     outs:
     - path: results/csv/01_dataset
       hash: md5
-      md5: 2eb25f5633d54595e29a072f5436c35f.dir
-      size: 192530
+      md5: 5e01277155036ff62747d6c48c967bef.dir
+      size: 192474
       nfiles: 4
   cycle_slip_results:
     cmd: uv run python -m real_time_bp.scripts.get_cycle_slip_results
     deps:
     - path: data/raw/backpropagation
       hash: md5
-      md5: 39be6a6322a8f98ac2ce6eda867262a2.dir
-      size: 2340865673
+      md5: b17c37ad2a3ecff281246888d365c5e5.dir
+      size: 4928392380
       nfiles: 10
     - path: real_time_bp/__init__.py
       hash: md5
@@ -118,8 +119,8 @@ stages:
       size: 9215
     - path: real_time_bp/scripts/get_cycle_slip_results.py
       hash: md5
-      md5: b2406e63d8e7949c8f94ea84ed201aed
-      size: 14909
+      md5: 2a95615f87a6ebd86798fc45de6eaf69
+      size: 15123
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 321d912380ca19e43714fef8fbfe3fdb
@@ -134,8 +135,8 @@ stages:
       size: 1614
     - path: real_time_bp/utils/params.py
       hash: md5
-      md5: d0db521576c3bbd5183e942b807a3fdd
-      size: 525
+      md5: 2188cf039dbaab5c07fb1be0f19e8da1
+      size: 1754
     - path: real_time_bp/utils/progress.py
       hash: md5
       md5: f4044f7e36dd369225fd7524c58378af
@@ -150,8 +151,8 @@ stages:
       size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: 2eb25f5633d54595e29a072f5436c35f.dir
-      size: 192530
+      md5: 5e01277155036ff62747d6c48c967bef.dir
+      size: 192474
       nfiles: 4
     params:
       params.yaml:
@@ -168,20 +169,21 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
-          - 512
-          - 1024
-          - 1536
-          - 2048
-          - 4096
-          - 8192
+            min: 512
+            max: 16384
+            step: 512
+          n_init_samples_boxplot: 8192
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 72
           score_curve_n_init_samples:
-          - 512
           - 1024
+          - 2048
           - 4096
           representative_c_n0_db_hz: 35.0
+          representative_case_rank_by_severity:
+            weak: 2
+            strong: 2
         runtime:
           csv_chunksize: 75000
           csv_write_batch_rows: 50000
@@ -193,16 +195,16 @@ stages:
     outs:
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
-      size: 113628128
+      md5: a20c268b5d3af88cc635c8f25790df94.dir
+      size: 384738758
       nfiles: 4
   filter_bank_results:
     cmd: uv run python -m real_time_bp.scripts.get_filter_bank_results
     deps:
     - path: data/raw/backpropagation
       hash: md5
-      md5: 39be6a6322a8f98ac2ce6eda867262a2.dir
-      size: 2340865673
+      md5: b17c37ad2a3ecff281246888d365c5e5.dir
+      size: 4928392380
       nfiles: 10
     - path: real_time_bp/__init__.py
       hash: md5
@@ -238,8 +240,8 @@ stages:
       size: 9215
     - path: real_time_bp/scripts/get_filter_bank_results.py
       hash: md5
-      md5: aec46718380a5a416081fe1b37be1f20
-      size: 19930
+      md5: 7ef7cfc352b1b4806ee162817aeb7179
+      size: 22134
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 321d912380ca19e43714fef8fbfe3fdb
@@ -254,8 +256,8 @@ stages:
       size: 1614
     - path: real_time_bp/utils/params.py
       hash: md5
-      md5: d0db521576c3bbd5183e942b807a3fdd
-      size: 525
+      md5: 2188cf039dbaab5c07fb1be0f19e8da1
+      size: 1754
     - path: real_time_bp/utils/progress.py
       hash: md5
       md5: f4044f7e36dd369225fd7524c58378af
@@ -270,13 +272,13 @@ stages:
       size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: 2eb25f5633d54595e29a072f5436c35f.dir
-      size: 192530
+      md5: 5e01277155036ff62747d6c48c967bef.dir
+      size: 192474
       nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
-      size: 113628128
+      md5: a20c268b5d3af88cc635c8f25790df94.dir
+      size: 384738758
       nfiles: 4
     params:
       params.yaml:
@@ -293,20 +295,21 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
-          - 512
-          - 1024
-          - 1536
-          - 2048
-          - 4096
-          - 8192
+            min: 512
+            max: 16384
+            step: 512
+          n_init_samples_boxplot: 8192
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 72
           score_curve_n_init_samples:
-          - 512
           - 1024
+          - 2048
           - 4096
           representative_c_n0_db_hz: 35.0
+          representative_case_rank_by_severity:
+            weak: 2
+            strong: 2
         runtime:
           csv_chunksize: 75000
           csv_write_batch_rows: 50000
@@ -318,16 +321,16 @@ stages:
     outs:
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: 712e3e4ad3d7e34f3f10f107e3899fab.dir
-      size: 19736480
-      nfiles: 7
+      md5: fb2d5dfc87c8446a13654f98fab3e622.dir
+      size: 19925852
+      nfiles: 8
   near_real_time_results:
     cmd: uv run python -m real_time_bp.scripts.get_near_real_time_results
     deps:
     - path: data/raw/backpropagation
       hash: md5
-      md5: 39be6a6322a8f98ac2ce6eda867262a2.dir
-      size: 2340865673
+      md5: b17c37ad2a3ecff281246888d365c5e5.dir
+      size: 4928392380
       nfiles: 10
     - path: real_time_bp/__init__.py
       hash: md5
@@ -355,8 +358,8 @@ stages:
       size: 5729
     - path: real_time_bp/methodology/near_real_time.py
       hash: md5
-      md5: 60b1326447766a5e529244a93177aee4
-      size: 5098
+      md5: 46d555f1940e427d857a54ff60903648
+      size: 6788
     - path: real_time_bp/methodology/signal_model.py
       hash: md5
       md5: 93c119bf53d86b7e4fe3640b822c2258
@@ -367,28 +370,28 @@ stages:
       size: 9215
     - path: real_time_bp/scripts/get_near_real_time_results.py
       hash: md5
-      md5: 13d2f6511c7c85e865e61c19cb71e4a8
-      size: 5435
+      md5: 50943dd60e92d7aed7db4f3f59ad20f8
+      size: 6441
     - path: real_time_bp/scripts/near_real_time/common.py
       hash: md5
       md5: 79f4e7eaed7d94a1d577f413a220ccc6
       size: 3222
     - path: real_time_bp/scripts/near_real_time/diagnostics.py
       hash: md5
-      md5: abf14597eaa8343b6f4f8dd00bef5fc4
-      size: 5687
+      md5: 427b9283bab1919fabec5bce00276823
+      size: 6046
     - path: real_time_bp/scripts/near_real_time/examples.py
       hash: md5
-      md5: a494c5f56957bc27bc03a9c5443ea34d
-      size: 10117
+      md5: a4942d9984165ac5443ed8c3aacf0a9a
+      size: 10493
     - path: real_time_bp/scripts/near_real_time/heatmap.py
       hash: md5
-      md5: 0700fa84a61b377147f78d1b0ad10019
-      size: 10962
+      md5: 585f5495c29e4f368705c26421afa376
+      size: 10794
     - path: real_time_bp/scripts/near_real_time/metrics.py
       hash: md5
-      md5: 34ba60708edf9fa2c932931a1ba5b11d
-      size: 9888
+      md5: 0c104c5bbf194547fd70f0f652a4c5b4
+      size: 17912
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 321d912380ca19e43714fef8fbfe3fdb
@@ -403,8 +406,8 @@ stages:
       size: 1614
     - path: real_time_bp/utils/params.py
       hash: md5
-      md5: d0db521576c3bbd5183e942b807a3fdd
-      size: 525
+      md5: 2188cf039dbaab5c07fb1be0f19e8da1
+      size: 1754
     - path: real_time_bp/utils/progress.py
       hash: md5
       md5: f4044f7e36dd369225fd7524c58378af
@@ -419,19 +422,19 @@ stages:
       size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: 2eb25f5633d54595e29a072f5436c35f.dir
-      size: 192530
+      md5: 5e01277155036ff62747d6c48c967bef.dir
+      size: 192474
       nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
-      size: 113628128
+      md5: a20c268b5d3af88cc635c8f25790df94.dir
+      size: 384738758
       nfiles: 4
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: 712e3e4ad3d7e34f3f10f107e3899fab.dir
-      size: 19736480
-      nfiles: 7
+      md5: fb2d5dfc87c8446a13654f98fab3e622.dir
+      size: 19925852
+      nfiles: 8
     params:
       params.yaml:
         constants:
@@ -447,50 +450,57 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
-          - 512
-          - 1024
-          - 1536
-          - 2048
-          - 4096
-          - 8192
+            min: 512
+            max: 16384
+            step: 512
+          n_init_samples_boxplot: 8192
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 72
           score_curve_n_init_samples:
-          - 512
           - 1024
+          - 2048
           - 4096
           representative_c_n0_db_hz: 35.0
+          representative_case_rank_by_severity:
+            weak: 2
+            strong: 2
         near_real_time:
           var_order_min: 1
           var_order_max: 24
           fft_m_values:
-          - 256
-          - 512
-          - 768
-          - 1024
-          - 1280
-          - 1536
-          - 1792
-          - 2048
+            min: 512
+            max: 2048
+            step: 128
           heatmap_latency_fractions:
-          - 0.0
-          - 0.125
-          - 0.25
-          - 0.375
-          - 0.5
-          - 0.625
-          - 0.75
-          - 0.875
-          - 1.0
+            min: 0.0
+            max: 1.0
+            step: 0.05
           heatmap_eval_samples: 750
           practical_fft_m: 1024
           practical_latency_samples: 511
           residual_doppler_error_hz_min: 0.0
           residual_doppler_error_hz_max: 1.5
           residual_doppler_error_count: 16
+          var_test_alpha: 0.05
+          var_whiteness_test_lags: 24
+          var_diagnostic_whiteness_lags:
+          - 6
+          - 12
+          - 24
+          var_diagnostic_plot_whiteness_lag: 24
+          var_forecast_horizons_samples:
+          - 1
+          - 4
+          - 16
+          - 64
+          - 256
+          var_forecast_eval_samples: 32
           heatmap_max_cases_per_severity: 1
           forecast_example_c_n0_db_hz: 35.0
+          forecast_example_block_len: 8192
+          forecast_example_latency_samples:
+          - 0
           example_ml_configs:
           - block_len: 2048
             latency_samples: 0
@@ -507,9 +517,9 @@ stages:
     outs:
     - path: results/csv/04_near_real_time
       hash: md5
-      md5: 0bbdc79f7a1c77fe875da71f1246354b.dir
-      size: 4889824
-      nfiles: 7
+      md5: b70b6286fc5b2e471023583a3584503f.dir
+      size: 8141510
+      nfiles: 9
   result_plots:
     cmd: uv run python -m real_time_bp.plots.main
     deps:
@@ -531,28 +541,28 @@ stages:
       size: 2758
     - path: real_time_bp/plots/cycle_slips.py
       hash: md5
-      md5: 179d84b273dd262fbf0c2fe1d953b262
-      size: 8930
+      md5: d6574ed9ca42d24ee8fb03a79f4be8af
+      size: 10276
     - path: real_time_bp/plots/filter_bank.py
       hash: md5
-      md5: 8539213912491d2e8db6e89b0444b7ed
-      size: 10107
+      md5: c5530fd508c23c8d9c84626cc72f4915
+      size: 11433
     - path: real_time_bp/plots/main.py
       hash: md5
       md5: 212cf6056ef706ba62a3a5fe3f609852
       size: 839
     - path: real_time_bp/plots/near_real_time.py
       hash: md5
-      md5: a5874b67bef30bca74a844e532252522
-      size: 21029
+      md5: ad4811452bd2b41a07a858d1bea7e97c
+      size: 30843
     - path: real_time_bp/utils/params.py
       hash: md5
-      md5: d0db521576c3bbd5183e942b807a3fdd
-      size: 525
+      md5: 2188cf039dbaab5c07fb1be0f19e8da1
+      size: 1754
     - path: real_time_bp/utils/plot_style.py
       hash: md5
-      md5: 7781e7c63ff6b6dd5581a464ba438e2e
-      size: 3730
+      md5: 0fbeff0f8a37190c2ae89cc4cf50d7c4
+      size: 3725
     - path: real_time_bp/utils/progress.py
       hash: md5
       md5: f4044f7e36dd369225fd7524c58378af
@@ -567,24 +577,24 @@ stages:
       size: 9433
     - path: results/csv/01_dataset
       hash: md5
-      md5: 2eb25f5633d54595e29a072f5436c35f.dir
-      size: 192530
+      md5: 5e01277155036ff62747d6c48c967bef.dir
+      size: 192474
       nfiles: 4
     - path: results/csv/02_cycle_slips
       hash: md5
-      md5: e87a31b3c1eeea3a646f424dd02fb69d.dir
-      size: 113628128
+      md5: a20c268b5d3af88cc635c8f25790df94.dir
+      size: 384738758
       nfiles: 4
     - path: results/csv/03_filter_bank
       hash: md5
-      md5: 712e3e4ad3d7e34f3f10f107e3899fab.dir
-      size: 19736480
-      nfiles: 7
+      md5: fb2d5dfc87c8446a13654f98fab3e622.dir
+      size: 19925852
+      nfiles: 8
     - path: results/csv/04_near_real_time
       hash: md5
-      md5: 0bbdc79f7a1c77fe875da71f1246354b.dir
-      size: 4889824
-      nfiles: 7
+      md5: b70b6286fc5b2e471023583a3584503f.dir
+      size: 8141510
+      nfiles: 9
     params:
       params.yaml:
         experiments:
@@ -593,50 +603,57 @@ stages:
           - strong
           n_init_samples: 4096
           n_init_sweep_samples:
-          - 512
-          - 1024
-          - 1536
-          - 2048
-          - 4096
-          - 8192
+            min: 512
+            max: 16384
+            step: 512
+          n_init_samples_boxplot: 8192
           tf_candidate_min_s: 0.5
           tf_candidate_max_s: 2.0
           tf_candidate_count: 72
           score_curve_n_init_samples:
-          - 512
           - 1024
+          - 2048
           - 4096
           representative_c_n0_db_hz: 35.0
+          representative_case_rank_by_severity:
+            weak: 2
+            strong: 2
         near_real_time:
           var_order_min: 1
           var_order_max: 24
           fft_m_values:
-          - 256
-          - 512
-          - 768
-          - 1024
-          - 1280
-          - 1536
-          - 1792
-          - 2048
+            min: 512
+            max: 2048
+            step: 128
           heatmap_latency_fractions:
-          - 0.0
-          - 0.125
-          - 0.25
-          - 0.375
-          - 0.5
-          - 0.625
-          - 0.75
-          - 0.875
-          - 1.0
+            min: 0.0
+            max: 1.0
+            step: 0.05
           heatmap_eval_samples: 750
           practical_fft_m: 1024
           practical_latency_samples: 511
           residual_doppler_error_hz_min: 0.0
           residual_doppler_error_hz_max: 1.5
           residual_doppler_error_count: 16
+          var_test_alpha: 0.05
+          var_whiteness_test_lags: 24
+          var_diagnostic_whiteness_lags:
+          - 6
+          - 12
+          - 24
+          var_diagnostic_plot_whiteness_lag: 24
+          var_forecast_horizons_samples:
+          - 1
+          - 4
+          - 16
+          - 64
+          - 256
+          var_forecast_eval_samples: 32
           heatmap_max_cases_per_severity: 1
           forecast_example_c_n0_db_hz: 35.0
+          forecast_example_block_len: 8192
+          forecast_example_latency_samples:
+          - 0
           example_ml_configs:
           - block_len: 2048
             latency_samples: 0
@@ -645,6 +662,9 @@ stages:
         plots:
           csv_dir: results/csv
           figures_dir: results/figures
+          forecast_zoom_start_s: 310
+          forecast_zoom_end_s: 370
+          forecast_zoom_latency_samples: 0
         tvd:
           fade_threshold_db: -10.0
           allowed_jump_weight: 1.0
@@ -652,6 +672,6 @@ stages:
     outs:
     - path: results/figures
       hash: md5
-      md5: d22ed71a288be69ae970ff8a2efecfc6.dir
-      size: 2388873
-      nfiles: 9
+      md5: d356187d9c90d5fbb6a47e34ce120809.dir
+      size: 3139954
+      nfiles: 10

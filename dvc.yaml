@@ -7,7 +7,7 @@ stages:
       - dataset.force_download
     outs:
       - data/raw/backpropagation
-    always_changed: true
+    always_changed: false
 
   dataset_summary:
     cmd: uv run python -m real_time_bp.scripts.get_dataset_summary

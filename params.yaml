@@ -42,8 +42,8 @@ experiments:
   # C/N0 used to choose representative examples for figures.
   representative_c_n0_db_hz: 35.0
   representative_case_rank_by_severity:
-    weak: 0
-    strong: 0
+    weak: 2
+    strong: 2
 
 tvd:
   # Paper: Methodology Section II.2; TVD jumps are allowed only
@@ -62,7 +62,7 @@ near_real_time:
   # Paper: Results Section III.3, Figure 11; heatmap over
   # FFT length M and latency L / (M - M_c - 1).
   fft_m_values:
-    min: 256
+    min: 512
     max: 2048
     step: 128
   # Paper: Figure 11 varies L from 0 to M-M_c-1. Fractions compare latency
@@ -79,7 +79,7 @@ near_real_time:
   practical_fft_m: 1024
   practical_latency_samples: 511
   residual_doppler_error_hz_min: 0.0
-  residual_doppler_error_hz_max: 0.6
+  residual_doppler_error_hz_max: 1.5
   residual_doppler_error_count: 16
   var_test_alpha: 0.05
   var_whiteness_test_lags: 24
@@ -100,8 +100,6 @@ near_real_time:
   forecast_example_block_len: 8192
   forecast_example_latency_samples:
     - 0
-    - 1024
-    - 2048
   example_ml_configs:
     - block_len: 2048
       latency_samples: 0
