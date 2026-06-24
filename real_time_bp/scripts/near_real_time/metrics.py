@@ -40,6 +40,8 @@ def iter_practical_tasks(
     tf_estimates: dict[int, float],
     representative_case_ids: set[int],
     forecast_case_id: int | dict[str, int] | None = None,
+    *,
+    include_phase_examples: bool = True,
 ):
     """Yield practical BP tasks with representative-example flags.
 
@@ -57,6 +59,8 @@ def iter_practical_tasks(
         representative_case_ids: Explicit case ids selected for examples.
         forecast_case_id: Optional preselected tracking case id, or one case id
             per severity, for the VAR forecast example.
+        include_phase_examples: Whether representative phase-example rows are
+            requested by the caller.
 
     Yields:
         Tuples consumed by `compute_practical_case_task`.
@@ -70,10 +74,13 @@ def iter_practical_tasks(
     for metadata, case_df in case_iter:
         severity = str(metadata.get("severity"))
         case_id = int(metadata.get("tracking_case_id", 0) or 0)
-        include_phase_example = case_id in representative_case_ids or (
-            not representative_case_ids
-            and is_representative_case(metadata, experiments)
-            and severity not in phase_example_severities
+        include_phase_example = include_phase_examples and (
+            case_id in representative_case_ids
+            or (
+                not representative_case_ids
+                and is_representative_case(metadata, experiments)
+                and severity not in phase_example_severities
+            )
         )
         if include_phase_example:
             phase_example_severities.add(severity)

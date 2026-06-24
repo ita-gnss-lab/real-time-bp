@@ -38,7 +38,9 @@ def plot_filter_bank() -> None:
         baseline.
     """
     out_dir = figure_stage_dir("03_filter_bank")
-    scores = read_csv("03_filter_bank/filter_bank_score_curves.csv")
+    scores = read_csv("03_filter_bank/filter_bank_representative_score_curves.csv")
+    if scores.empty:
+        scores = read_csv("03_filter_bank/filter_bank_score_curves.csv")
     estimates = amplitude_only(read_csv("03_filter_bank/filter_bank_estimates.csv"))
     boxplot_estimates = amplitude_only(
         read_csv("03_filter_bank/filter_bank_boxplot_estimates.csv")

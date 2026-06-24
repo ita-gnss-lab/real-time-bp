@@ -39,7 +39,6 @@ from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import fixed_step_values, load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
 from real_time_bp.utils.representatives import (
-    load_representative_case_ids,
     severity_groups,
     sort_by_severity,
 )
@@ -93,7 +92,6 @@ def main() -> None:
     wavelength_m = l1_wavelength_from_params(params)
     candidates = tf_candidate_grid(params)
     score_n_init_samples = _score_curve_n_init_samples(experiments)
-    representative_case_ids = set(load_representative_case_ids().values())
     max_cases = optional_int(experiments.get("max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
     workers = parallel_workers_from_params(params)
@@ -107,7 +105,6 @@ def main() -> None:
     score_rows: list[dict] = []
     estimate_rows: list[dict] = []
     downstream_rows: list[dict] = []
-    representative_trace_rows: list[dict] = []
 
     case_iter = iter_case_dataframes(
         paths,
@@ -124,9 +121,8 @@ def main() -> None:
         residual_doppler_error_hz=0.0,
         n_init=int(experiments.get("n_init_samples", 4096)),
         score_n_init_samples=score_n_init_samples,
-        include_representative_traces=True,
+        include_representative_traces=False,
         experiments=experiments,
-        representative_case_ids=representative_case_ids,
     )
     result_iter = ordered_parallel_map(
         _compute_case_filter_bank_task,
@@ -142,7 +138,6 @@ def main() -> None:
         score_rows.extend(result["score_rows"])
         estimate_rows.extend(result["estimate_rows"])
         downstream_rows.extend(result["downstream_rows"])
-        representative_trace_rows.extend(result["trace_rows"])
 
     write_sorted_csv(
         pd.DataFrame(score_rows),
@@ -153,11 +148,6 @@ def main() -> None:
     write_csv(estimates_df, out_dir / ESTIMATES_CSV)
     downstream_df = sort_by_severity(pd.DataFrame(downstream_rows), ["tracking_case_id"])
     write_csv(downstream_df, out_dir / DOWNSTREAM_METRICS_CSV)
-    write_sorted_csv(
-        pd.DataFrame(representative_trace_rows),
-        out_dir / REPRESENTATIVE_TRACES_CSV,
-        ["tracking_case_id", "sample_index"],
-    )
     write_csv(_aggregate_tf_error_metrics(estimates_df), out_dir / TF_ERROR_METRICS_CSV)
     write_csv(_aggregate_downstream_metrics(downstream_df), out_dir / DOWNSTREAM_SUMMARY_CSV)
     write_csv(

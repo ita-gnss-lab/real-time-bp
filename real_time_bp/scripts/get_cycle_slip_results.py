@@ -30,7 +30,6 @@ from real_time_bp.utils.stage import (
     l1_wavelength_from_params,
     optional_int,
     parallel_workers_from_params,
-    write_csv,
 )
 
 TVD_TRACKING_COLUMNS = {
@@ -161,7 +160,6 @@ def main() -> None:
         task_iter,
         workers=workers,
     )
-    candidates_by_severity: dict[str, list[tuple[tuple[float, ...], dict]]] = {}
     with (
         BufferedCsvWriter(
             out_dir / EVENTS_CSV,
@@ -183,43 +181,6 @@ def main() -> None:
             event_writer.write_many(result["event_rows"])
             summary_row = result["summary_row"]
             summary_writer.write(summary_row)
-            rank_key = _representative_rank_key(summary_row)
-            if rank_key is not None:
-                severity = str(summary_row.get("severity"))
-                candidates_by_severity.setdefault(severity, []).append((rank_key, summary_row))
-
-    representative_rows = _representative_rows(candidates_by_severity, experiments)
-    write_csv(
-        pd.DataFrame(representative_rows, columns=REPRESENTATIVE_COLUMNS),
-        out_dir / REPRESENTATIVES_CSV,
-    )
-    selected_case_ids = {
-        int(row["tracking_case_id"])
-        for row in representative_rows
-        if row.get("tracking_case_id") is not None
-    }
-    trace_case_iter = iter_case_dataframes(
-        paths,
-        severities=experiments.get("severities"),
-        max_cases_per_condition=None,
-        chunksize=chunksize,
-        columns=TVD_TRACKING_COLUMNS,
-    )
-    with BufferedCsvWriter(
-        out_dir / TRACES_CSV,
-        columns=TRACE_COLUMNS,
-        batch_rows=write_batch_rows,
-    ) as trace_writer:
-        for trace_rows in _iter_representative_tvd_traces(
-            trace_case_iter,
-            selected_case_ids,
-            float(wavelength_m),
-            int(experiments.get("n_init_samples", 4096)),
-            float(tvd_cfg.get("fade_threshold_db", -15.0)),
-            float(tvd_cfg.get("allowed_jump_weight", 1.0)),
-            float(tvd_cfg.get("blocked_jump_weight", 10000.0)),
-        ):
-            trace_writer.write_many(trace_rows)
     logger.info("Finished TVD cycle-slip stage")
 
 

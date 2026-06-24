@@ -39,12 +39,6 @@ experiments:
     - 1024
     - 2048
     - 4096
-  # C/N0 used to choose representative examples for figures.
-  representative_c_n0_db_hz: 35.0
-  representative_case_rank_by_severity:
-    weak: 2
-    strong: 2
-
 tvd:
   # Paper: Methodology Section II.2; TVD jumps are allowed only
   # at local fade minima below this intensity threshold.
@@ -112,3 +106,10 @@ plots:
   forecast_zoom_start_s: 310.0
   forecast_zoom_end_s: 370.0
   forecast_zoom_latency_samples: 0
+
+representatives:
+  # Change these ranks to inspect different representative examples. DVC only
+  # needs to rerun the lightweight representative-results and plotting stages.
+  case_rank_by_severity:
+    weak: 2
+    strong: 2

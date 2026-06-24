@@ -23,7 +23,6 @@ from real_time_bp.utils.io import count_cases, find_dataset_paths, iter_case_dat
 from real_time_bp.utils.parallel import ordered_parallel_map
 from real_time_bp.utils.params import load_params
 from real_time_bp.utils.progress import configure_logging, progress_iter
-from real_time_bp.utils.representatives import load_representative_case_ids
 from real_time_bp.utils.stage import (
     csv_chunksize_from_params,
     csv_stage_dir,
@@ -64,7 +63,6 @@ def main() -> None:
     max_cases = optional_int(experiments.get("max_cases_per_condition"))
     chunksize = csv_chunksize_from_params(params)
     tf_estimates = load_amplitude_tf_estimates()
-    representative_case_ids = set(load_representative_case_ids().values())
     forecast_case_ids = select_forecast_case_ids(params, paths, tf_estimates)
     if forecast_case_ids:
         logger.info("Using VAR forecast examples {}", forecast_case_ids)
@@ -80,7 +78,6 @@ def main() -> None:
     var_residual_summary_rows: list[dict] = []
     var_forecast_utility_rows: list[dict] = []
     practical_rows: list[dict] = []
-    example_rows: list[dict] = []
     forecast_rows: list[dict] = []
 
     case_iter = iter_case_dataframes(
@@ -95,8 +92,9 @@ def main() -> None:
         params,
         wavelength_m,
         tf_estimates,
-        representative_case_ids,
+        set(),
         forecast_case_ids,
+        include_phase_examples=False,
     )
     result_iter = ordered_parallel_map(
         compute_practical_case_task,
@@ -115,20 +113,19 @@ def main() -> None:
         var_residual_summary_rows.extend(result["var_residual_summary_rows"])
         var_forecast_utility_rows.extend(result["var_forecast_utility_rows"])
         practical_rows.append(result["practical_row"])
-        example_rows.extend(result["example_rows"])
         forecast_rows.extend(result["forecast_rows"])
     residual_metrics = compute_residual_doppler_metrics(
         params,
         paths,
         wavelength_m,
         tf_estimates,
-        representative_case_ids,
+        set(),
     )
     residual_diagnostics = compute_var_residual_diagnostics(
         params,
         paths,
         wavelength_m,
-        representative_case_ids,
+        set(),
     )
 
     heatmap_df = compute_heatmap(params, paths, wavelength_m, tf_estimates)
@@ -151,11 +148,6 @@ def main() -> None:
         pd.DataFrame(practical_rows),
         out_dir / PRACTICAL_METRICS_CSV,
         ["tracking_case_id"],
-    )
-    write_sorted_csv(
-        pd.DataFrame(example_rows),
-        out_dir / PHASE_EXAMPLE_CSV,
-        ["tracking_case_id", "sample_index"],
     )
     write_sorted_csv(
         pd.DataFrame(forecast_rows),
