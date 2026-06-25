@@ -131,7 +131,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
             curve = n_group.sort_values("fresnel_time_candidate_s")
             color = n_init_colors[style_idx]
             linestyle = N_INIT_LINESTYLES[style_idx % len(N_INIT_LINESTYLES)]
-            label = rf"$J(T_{{\mathrm{{F}}}}),\ N_{{\mathrm{{init}}}}={int(n_init)}$"
+            label = rf"$J(T_{{\mathrm{{F}},p}}),\ N_{{\mathrm{{init}}}}={int(n_init)}$"
             estimated_tf = (
                 float(curve["estimated_fresnel_time_scale_s"].iloc[0])
                 if "estimated_fresnel_time_scale_s" in curve
@@ -167,7 +167,7 @@ def _plot_score_curves(scores: pd.DataFrame, path: Path) -> None:
                 )
         ax.set_title(str(severity).capitalize())
         ax.set_xlabel(r"$T_{\mathrm{F}}$ [s]")
-    plot_axes[0].set_ylabel(r"$J\left(T_{\mathrm{F}}\right)$")
+    plot_axes[0].set_ylabel(r"$J\left(T_{\mathrm{F},p}\right)$")
     handles, labels = _unique_legend_items(plot_axes)
     if handles:
         legend_ax.legend(handles, labels, loc="center left")

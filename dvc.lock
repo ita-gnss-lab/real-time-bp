@@ -625,8 +625,8 @@ stages:
       size: 9229
     - path: real_time_bp/plots/filter_bank.py
       hash: md5
-      md5: 4cc43f1cc0a0f6373ea3c4775e18239c
-      size: 11604
+      md5: f085e6536c8873296b2682f7866aa8b0
+      size: 11608
     - path: real_time_bp/plots/main.py
       hash: md5
       md5: 4180dfbf600e806c3f103209e785aaed
@@ -676,8 +676,8 @@ stages:
       nfiles: 0
     - path: results/figures
       hash: md5
-      md5: f22bd1cfae2c9ee5676fc2eb06cd3910.dir
-      size: 2835332
+      md5: d6b53619ce2f01051650692c7eba456c.dir
+      size: 2899691
       nfiles: 8
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
