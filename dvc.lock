@@ -51,8 +51,8 @@ stages:
       size: 1226
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
         constants:
@@ -209,11 +209,6 @@ stages:
       md5: b17c37ad2a3ecff281246888d365c5e5.dir
       size: 4928392380
       nfiles: 10
-    - path: outputs/01_dataset
-      hash: md5
-      md5: 5e01277155036ff62747d6c48c967bef.dir
-      size: 192474
-      nfiles: 4
     - path: real_time_bp/__init__.py
       hash: md5
       md5: e9ad8d978484da480dedb2f19b2180f0
@@ -276,12 +271,12 @@ stages:
       size: 5568
     - path: real_time_bp/utils/representatives.py
       hash: md5
-      md5: 1c7aa3c08cbdb371288be939833663a6
-      size: 3428
+      md5: 6fb22730a0ba0dced9cf5b6835c93692
+      size: 2566
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
         constants:
@@ -314,7 +309,6 @@ stages:
           max_diffractive_phase_span_cycles: 100.0
         runtime:
           csv_chunksize: 75000
-          csv_write_batch_rows: 50000
           parallel_workers: 32
         tvd:
           fade_threshold_db: -10.0
@@ -569,28 +563,30 @@ stages:
   result_plots:
     cmd: uv run python -m real_time_bp.plots.main
     deps:
-    - path: outputs/01_dataset
-      hash: md5
-      md5: 5e01277155036ff62747d6c48c967bef.dir
-      size: 192474
-      nfiles: 4
     - path: outputs/02_cycle_slips/tvd_example_traces.csv
       hash: md5
       md5: e417f990fc457c4f0a986d49423489f4
       size: 826525
-    - path: outputs/02_cycle_slips/tvd_representative_cases.csv
+    - path: outputs/03_filter_bank/filter_bank_boxplot_estimates.csv
       hash: md5
-      md5: 2cf05b8c6ffaf2d47d322dae86065bb8
-      size: 600
-    - path: outputs/03_filter_bank
+      md5: 24dec7a700aa1740ac2003661e3f77c5
+      size: 192473
+    - path: outputs/03_filter_bank/filter_bank_n_init_sensitivity.csv
       hash: md5
-      md5: bdaba84ed9a1a59410177ece19adf1d2.dir
-      size: 15416972
-      nfiles: 9
+      md5: c72222fb00f9c430c3a6150713041819
+      size: 4688
+    - path: outputs/03_filter_bank/filter_bank_representative_phase_traces.csv
+      hash: md5
+      md5: a2a14c6fbf81a630a76e7762a50cf978
+      size: 1417604
+    - path: outputs/03_filter_bank/filter_bank_representative_score_curves.csv
+      hash: md5
+      md5: 07d18947144070dd79297e2b762c7516
+      size: 69079
     - path: outputs/04_sliding/sliding_forecast_example.csv
       hash: md5
-      md5: 45df1e78fae16f7878445e6b5991de59
-      size: 1961943
+      md5: cbeb558c01ddea662b93ca75fca5b147
+      size: 10510976
     - path: outputs/04_sliding/sliding_latency_heatmap.csv
       hash: md5
       md5: 1692d756241d32b298cd496c02616ba3
@@ -637,8 +633,8 @@ stages:
       size: 889
     - path: real_time_bp/plots/sliding.py
       hash: md5
-      md5: 235075a16ef7f891583ed7d60b43e6b2
-      size: 23717
+      md5: ae955868c1df75a12c6835f614c80f97
+      size: 25932
     - path: real_time_bp/utils/params.py
       hash: md5
       md5: 2188cf039dbaab5c07fb1be0f19e8da1
@@ -653,81 +649,25 @@ stages:
       size: 1226
     - path: real_time_bp/utils/representatives.py
       hash: md5
-      md5: 1c7aa3c08cbdb371288be939833663a6
-      size: 3428
+      md5: 6fb22730a0ba0dced9cf5b6835c93692
+      size: 2566
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
-        experiments:
-          severities:
-          - weak
-          - strong
-          n_init_samples: 4096
-          n_init_sweep_samples:
-            min: 512
-            max: 16384
-            step: 512
-          n_init_samples_boxplot: 8192
-          tf_candidate_min_s: 0.5
-          tf_candidate_max_s: 2.0
-          tf_candidate_count: 72
-          score_curve_n_init_samples:
-          - 1024
-          - 2048
-          - 4096
-        plots:
-          csv_dir: outputs
-          csv_tables_dir: results/csv_tables
-          figures_dir: results/figures
-          forecast_zoom_start_s: 240.0
-          forecast_zoom_end_s: 300.0
-          forecast_zoom_latency_samples: 10
-        representatives:
-          case_rank_by_severity:
-            weak: 500
-            strong: 350
-        sliding:
-          var_order_min: 1
-          var_order_max: 24
-          fft_m_values:
-            min: 512
-            max: 2048
-            step: 128
-          heatmap_latency_fractions:
-            min: 0.0
-            max: 1.0
-            step: 0.05
-          heatmap_cases_per_severity: 1
-          practical_fft_m: 1024
-          practical_latency_samples: 511
-          var_whiteness_test_lags: 24
-          var_diagnostic_whiteness_lags:
-          - 6
-          - 12
-          - 24
-          var_forecast_horizons_samples:
-          - 1
-          - 4
-          - 16
-          - 64
-          - 256
-          var_forecast_eval_samples: 32
-          forecast_example_c_n0_db_hz: 35.0
-          forecast_example_block_len: 8192
-          forecast_example_latency_samples:
-          - 0
-          example_ml_configs:
-          - block_len: 2048
-            latency_samples: 0
-          - block_len: 2048
-            latency_samples: 512
-        tvd:
-          fade_threshold_db: -10.0
-          allowed_jump_weight: 1.0
-          blocked_jump_weight: 10000.0
+        experiments.n_init_samples: 4096
+        experiments.n_init_samples_boxplot: 8192
+        experiments.score_curve_n_init_samples:
+        - 1024
+        - 2048
+        - 4096
+        plots.forecast_zoom_end_s: 370.0
+        plots.forecast_zoom_start_s: 310.0
+        sliding.forecast_example_latency_samples:
+        - 0
+        tvd.fade_threshold_db: -10.0
     outs:
     - path: results/csv_tables
       hash: md5
@@ -736,8 +676,8 @@ stages:
       nfiles: 0
     - path: results/figures
       hash: md5
-      md5: 7f1e42a07dc86e02af12f8c4eb3296db.dir
-      size: 2572848
+      md5: c4e93f3b54d5e7486025cedcaf990c30.dir
+      size: 2870843
       nfiles: 8
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
@@ -789,28 +729,28 @@ stages:
       size: 11495
     - path: real_time_bp/scripts/cycle_slips.py
       hash: md5
-      md5: 673838eb0932d3759f5ae35f4a0df7db
-      size: 7707
+      md5: 49342c67a407332eb5946ea053b7e83f
+      size: 7231
     - path: real_time_bp/scripts/get_filter_bank_results.py
       hash: md5
       md5: 9baa47fb6efde4bc6bae376a971b8c9b
       size: 23745
     - path: real_time_bp/scripts/get_representative_results.py
       hash: md5
-      md5: 8bb1ac3a7e6c1dd4d7849077dc899ab3
-      size: 12699
+      md5: 52bd49ce983fa17e46929f62d7969c0c
+      size: 12500
     - path: real_time_bp/scripts/sliding/common.py
       hash: md5
       md5: af5f9259a6eb45ed2b75f70895d61552
       size: 4892
     - path: real_time_bp/scripts/sliding/examples.py
       hash: md5
-      md5: 9086c80885282c806e40456f47944182
-      size: 10799
+      md5: 078815ced8269c1bff1038e6daa88944
+      size: 10688
     - path: real_time_bp/scripts/sliding/metrics.py
       hash: md5
-      md5: 4063e21b463584174f6cc8820fe8cc59
-      size: 21261
+      md5: 12076733ebcc7cbd4c0737cbdd314263
+      size: 15292
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 6dd42a5f28d5b6621360e5017a46c09f
@@ -833,12 +773,12 @@ stages:
       size: 5568
     - path: real_time_bp/utils/representatives.py
       hash: md5
-      md5: 1c7aa3c08cbdb371288be939833663a6
-      size: 3428
+      md5: 6fb22730a0ba0dced9cf5b6835c93692
+      size: 2566
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
         constants:
@@ -875,7 +815,6 @@ stages:
             strong: 350
         runtime:
           csv_chunksize: 75000
-          csv_write_batch_rows: 50000
           parallel_workers: 32
         sliding.example_ml_configs:
         - block_len: 2048
@@ -895,10 +834,6 @@ stages:
       hash: md5
       md5: e417f990fc457c4f0a986d49423489f4
       size: 826525
-    - path: outputs/02_cycle_slips/tvd_representative_cases.csv
-      hash: md5
-      md5: 2cf05b8c6ffaf2d47d322dae86065bb8
-      size: 600
     - path: outputs/03_filter_bank/filter_bank_representative_phase_traces.csv
       hash: md5
       md5: a2a14c6fbf81a630a76e7762a50cf978
@@ -919,11 +854,6 @@ stages:
       md5: b17c37ad2a3ecff281246888d365c5e5.dir
       size: 4928392380
       nfiles: 10
-    - path: outputs/01_dataset
-      hash: md5
-      md5: 5e01277155036ff62747d6c48c967bef.dir
-      size: 192474
-      nfiles: 4
     - path: outputs/03_filter_bank/filter_bank_estimates.csv
       hash: md5
       md5: 1e49237aaaad561e1aa9fa704224c8f3
@@ -966,20 +896,20 @@ stages:
       size: 11495
     - path: real_time_bp/scripts/get_sliding_results.py
       hash: md5
-      md5: 59e69fd9b53753b5deacbb52340bdac2
-      size: 5540
+      md5: bbc78a90eb9b1be4c5098e4c12e9964b
+      size: 4809
     - path: real_time_bp/scripts/sliding/common.py
       hash: md5
       md5: af5f9259a6eb45ed2b75f70895d61552
       size: 4892
     - path: real_time_bp/scripts/sliding/examples.py
       hash: md5
-      md5: 9086c80885282c806e40456f47944182
-      size: 10799
+      md5: 078815ced8269c1bff1038e6daa88944
+      size: 10688
     - path: real_time_bp/scripts/sliding/metrics.py
       hash: md5
-      md5: 4063e21b463584174f6cc8820fe8cc59
-      size: 21261
+      md5: 12076733ebcc7cbd4c0737cbdd314263
+      size: 15292
     - path: real_time_bp/utils/io.py
       hash: md5
       md5: 6dd42a5f28d5b6621360e5017a46c09f
@@ -1006,12 +936,12 @@ stages:
       size: 5568
     - path: real_time_bp/utils/representatives.py
       hash: md5
-      md5: 1c7aa3c08cbdb371288be939833663a6
-      size: 3428
+      md5: 6fb22730a0ba0dced9cf5b6835c93692
+      size: 2566
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
         constants:
@@ -1044,7 +974,6 @@ stages:
           max_diffractive_phase_span_cycles: 100.0
         runtime:
           csv_chunksize: 75000
-          csv_write_batch_rows: 50000
           parallel_workers: 32
         sliding.forecast_example_block_len: 8192
         sliding.forecast_example_c_n0_db_hz: 35.0
@@ -1052,20 +981,8 @@ stages:
         - 0
         sliding.practical_fft_m: 1024
         sliding.practical_latency_samples: 511
-        sliding.var_diagnostic_whiteness_lags:
-        - 6
-        - 12
-        - 24
-        sliding.var_forecast_eval_samples: 32
-        sliding.var_forecast_horizons_samples:
-        - 1
-        - 4
-        - 16
-        - 64
-        - 256
         sliding.var_order_max: 24
         sliding.var_order_min: 1
-        sliding.var_whiteness_test_lags: 24
         tvd:
           fade_threshold_db: -10.0
           allowed_jump_weight: 1.0
@@ -1073,24 +990,16 @@ stages:
     outs:
     - path: outputs/04_sliding/sliding_forecast_example.csv
       hash: md5
-      md5: 45df1e78fae16f7878445e6b5991de59
-      size: 1961943
+      md5: cbeb558c01ddea662b93ca75fca5b147
+      size: 10510976
     - path: outputs/04_sliding/sliding_practical_metrics.csv
       hash: md5
       md5: aad1e8022e4339953627d79d6e0d17a1
       size: 222478
-    - path: outputs/04_sliding/sliding_var_forecast_utility.csv
-      hash: md5
-      md5: a724df9a1ff685b995bcade81bb120fb
-      size: 704424
     - path: outputs/04_sliding/sliding_var_orders.csv
       hash: md5
       md5: 09893ffa097a0ee439d734342ed46480
       size: 112855
-    - path: outputs/04_sliding/sliding_var_residual_summary.csv
-      hash: md5
-      md5: 2b587a8d74824db71e15fabed1528560
-      size: 433706
   sliding_heatmap:
     cmd: uv run python -m real_time_bp.scripts.get_sliding_heatmap
     deps:
@@ -1141,8 +1050,8 @@ stages:
       size: 11495
     - path: real_time_bp/scripts/get_sliding_heatmap.py
       hash: md5
-      md5: 9c3099f0a7c0e9f2cc44aaacb8ebb1e8
-      size: 1696
+      md5: 5dbb75645d10c55b5aa5e4ac16c173be
+      size: 1478
     - path: real_time_bp/scripts/sliding/common.py
       hash: md5
       md5: af5f9259a6eb45ed2b75f70895d61552
@@ -1173,12 +1082,12 @@ stages:
       size: 5568
     - path: real_time_bp/utils/representatives.py
       hash: md5
-      md5: 1c7aa3c08cbdb371288be939833663a6
-      size: 3428
+      md5: 6fb22730a0ba0dced9cf5b6835c93692
+      size: 2566
     - path: real_time_bp/utils/stage.py
       hash: md5
-      md5: 8166caa7a397b4c9607c3f60f5c9e3b0
-      size: 9820
+      md5: ffe0ae467872ca3e1f050399a73d7b89
+      size: 9435
     params:
       params.yaml:
         constants:
@@ -1211,7 +1120,6 @@ stages:
           max_diffractive_phase_span_cycles: 100.0
         runtime:
           csv_chunksize: 75000
-          csv_write_batch_rows: 50000
           parallel_workers: 32
         sliding.fft_m_values:
           min: 512
@@ -1233,7 +1141,3 @@ stages:
       hash: md5
       md5: 1692d756241d32b298cd496c02616ba3
       size: 56316
-    - path: outputs/04_sliding/sliding_latency_heatmap_cases.csv
-      hash: md5
-      md5: 1f077c7c544e23f3efa6c17609ba5ecf
-      size: 51669

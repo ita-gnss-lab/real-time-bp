@@ -88,8 +88,8 @@ sliding:
       latency_samples: 512
 
 plots:
-  forecast_zoom_start_s: 240.0
-  forecast_zoom_end_s: 300.0
+  forecast_zoom_start_s: 310.0
+  forecast_zoom_end_s: 370.0
 
 representatives:
   # Change these ranks to inspect different representative examples. DVC only
