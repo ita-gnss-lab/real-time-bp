@@ -190,10 +190,6 @@ def forecast_example_rows(
         return []
     features = np.column_stack([np.real(signal), np.imag(signal)])
     time_sec = np.asarray(case_df["time_sec"], dtype=float)
-    sample_interval_s = float(np.nanmedian(np.diff(time_sec))) if time_sec.size > 1 else 1.0
-    if not np.isfinite(sample_interval_s) or sample_interval_s <= 0.0:
-        sample_interval_s = 1.0
-    context_samples = max(int(round(10.0 / sample_interval_s)), 0)
     rows = []
     for latency in _forecast_example_latencies(future_context, latencies):
         observed_stop = center + int(latency)
@@ -205,13 +201,16 @@ def forecast_example_rows(
         forecast = var_result.forecast(history, steps=forecast_steps)
         forecast_start_sample = int(observed_stop + 1)
         forecast_start_time = float(time_sec[forecast_start_sample])
-        display_start = max(0, forecast_start_sample - context_samples)
-        display_stop = forecast_start_sample + forecast_steps
+        # Export the full case so changing only the plot zoom does not require
+        # regenerating the forecast CSV. Forecast values are finite only over
+        # the actually predicted future interval.
+        display_start = 0
+        display_stop = len(case_df)
         for sample in range(display_start, display_stop):
             forecast_idx = sample - forecast_start_sample
             forecast_value = (
                 forecast[forecast_idx, 0] + 1j * forecast[forecast_idx, 1]
-                if forecast_idx >= 0
+                if 0 <= forecast_idx < forecast_steps
                 else np.nan + 1j * np.nan
             )
             rows.append(

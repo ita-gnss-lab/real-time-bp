@@ -161,19 +161,6 @@ def csv_chunksize_from_params(params: dict[str, Any]) -> int:
     return max(int(runtime.get("csv_chunksize", 75_000)), 1)
 
 
-def csv_write_batch_rows_from_params(params: dict[str, Any]) -> int:
-    """Read the buffered CSV output batch size from runtime parameters.
-
-    Args:
-        params: Parsed `params.yaml` dictionary.
-
-    Returns:
-        Positive number of rows per buffered write.
-    """
-    runtime = params.get("runtime", {})
-    return max(int(runtime.get("csv_write_batch_rows", 50_000)), 1)
-
-
 def parallel_workers_from_params(params: dict[str, Any]) -> int:
     """Read the shared worker count from runtime parameters.
 

@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pandas as pd
-
-from real_time_bp.config import OUTPUTS_DIR
 
 SEVERITY_ORDER = ("weak", "strong")
 SEVERITY_COLORS = {
@@ -84,25 +80,3 @@ def sort_by_severity(df: pd.DataFrame, extra_columns: list[str] | None = None) -
         .sort_values(sort_columns)
         .drop(columns="_severity_order")
     )
-
-
-def load_representative_case_ids(csv_dir: Path = OUTPUTS_DIR) -> dict[str, int]:
-    """Load representative TVD case ids selected by the representative stage.
-
-    Args:
-        csv_dir: Root operational CSV output directory.
-
-    Returns:
-        Mapping from severity label to tracking case id.
-    """
-    path = csv_dir / "02_cycle_slips" / "tvd_representative_cases.csv"
-    if not path.exists() or path.stat().st_size == 0:
-        return {}
-    df = pd.read_csv(path)
-    if df.empty or "severity" not in df.columns or "tracking_case_id" not in df.columns:
-        return {}
-    return {
-        str(row.severity): int(row.tracking_case_id)
-        for row in sort_by_severity(df).itertuples()
-        if str(row.severity) in SEVERITY_ORDER and pd.notna(row.tracking_case_id)
-    }

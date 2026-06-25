@@ -30,8 +30,6 @@ from real_time_bp.utils.stage import (
 
 STAGE_DIR = "04_sliding"
 VAR_ORDERS_CSV = "sliding_var_orders.csv"
-VAR_RESIDUAL_SUMMARY_CSV = "sliding_var_residual_summary.csv"
-VAR_FORECAST_UTILITY_CSV = "sliding_var_forecast_utility.csv"
 PRACTICAL_METRICS_CSV = "sliding_practical_metrics.csv"
 PHASE_EXAMPLE_CSV = "sliding_phase_example.csv"
 FORECAST_EXAMPLE_CSV = "sliding_forecast_example.csv"
@@ -88,8 +86,6 @@ def main() -> None:
     )
 
     var_order_rows: list[dict] = []
-    var_residual_summary_rows: list[dict] = []
-    var_forecast_utility_rows: list[dict] = []
     practical_rows: list[dict] = []
     forecast_rows: list[dict] = []
 
@@ -124,8 +120,6 @@ def main() -> None:
         if result is None:
             continue
         var_order_rows.append(result["var_order_row"])
-        var_residual_summary_rows.extend(result["var_residual_summary_rows"])
-        var_forecast_utility_rows.extend(result["var_forecast_utility_rows"])
         practical_rows.append(result["practical_row"])
         forecast_rows.extend(result["forecast_rows"])
 
@@ -133,16 +127,6 @@ def main() -> None:
         pd.DataFrame(var_order_rows),
         out_dir / VAR_ORDERS_CSV,
         ["tracking_case_id"],
-    )
-    write_sorted_csv(
-        pd.DataFrame(var_residual_summary_rows),
-        out_dir / VAR_RESIDUAL_SUMMARY_CSV,
-        ["tracking_case_id", "requested_whiteness_lag"],
-    )
-    write_sorted_csv(
-        pd.DataFrame(var_forecast_utility_rows),
-        out_dir / VAR_FORECAST_UTILITY_CSV,
-        ["tracking_case_id", "forecast_horizon_samples"],
     )
     write_sorted_csv(
         pd.DataFrame(practical_rows),

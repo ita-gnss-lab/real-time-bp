@@ -17,7 +17,6 @@ from real_time_bp.utils.stage import (
 )
 
 STAGE_DIR = "04_sliding"
-LATENCY_HEATMAP_CASES_CSV = "sliding_latency_heatmap_cases.csv"
 LATENCY_HEATMAP_CSV = "sliding_latency_heatmap.csv"
 
 
@@ -33,11 +32,6 @@ def main() -> None:
     logger.info("Using {} parallel worker(s)", parallel_workers_from_params(params))
 
     case_rows = compute_heatmap(params, paths, wavelength_m, tf_estimates)
-    write_sorted_csv(
-        case_rows,
-        out_dir / LATENCY_HEATMAP_CASES_CSV,
-        ["tracking_case_id", "block_len", "latency_samples"],
-    )
     write_sorted_csv(
         aggregate_heatmap_cases(case_rows),
         out_dir / LATENCY_HEATMAP_CSV,

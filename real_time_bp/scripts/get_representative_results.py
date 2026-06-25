@@ -7,8 +7,9 @@ import numpy as np
 import pandas as pd
 
 from real_time_bp.scripts.cycle_slips import (
-    REPRESENTATIVE_COLUMNS,
-    REPRESENTATIVES_CSV,
+    STAGE_DIR as CYCLE_STAGE_DIR,
+)
+from real_time_bp.scripts.cycle_slips import (
     TRACE_COLUMNS,
     TRACES_CSV,
     TVD_TRACKING_COLUMNS,
@@ -16,9 +17,6 @@ from real_time_bp.scripts.cycle_slips import (
     _representative_rank_key,
     _representative_rows,
     compute_tvd_summary_row,
-)
-from real_time_bp.scripts.cycle_slips import (
-    STAGE_DIR as CYCLE_STAGE_DIR,
 )
 from real_time_bp.scripts.get_filter_bank_results import (
     FILTER_BANK_TRACKING_COLUMNS,
@@ -49,7 +47,6 @@ from real_time_bp.utils.stage import (
     l1_wavelength_from_params,
     optional_int,
     tf_candidate_grid,
-    write_csv,
     write_sorted_csv,
 )
 
@@ -81,11 +78,6 @@ def main() -> None:
     }
     logger.info("Selected representative case ids {}", sorted(selected_case_ids))
 
-    cycle_dir = csv_stage_dir(CYCLE_STAGE_DIR)
-    write_csv(
-        pd.DataFrame(selected_rows, columns=REPRESENTATIVE_COLUMNS),
-        cycle_dir / REPRESENTATIVES_CSV,
-    )
     tvd_trace_rows = compute_tvd_trace_rows(
         params,
         paths,
@@ -94,6 +86,7 @@ def main() -> None:
         chunksize,
     )
     validate_selected_cases(tvd_trace_rows, selected_case_ids, "TVD traces")
+    cycle_dir = csv_stage_dir(CYCLE_STAGE_DIR)
     write_sorted_csv(
         pd.DataFrame(tvd_trace_rows, columns=TRACE_COLUMNS),
         cycle_dir / TRACES_CSV,

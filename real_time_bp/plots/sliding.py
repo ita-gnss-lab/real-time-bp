@@ -455,8 +455,21 @@ def _plot_forecast_example(df: pd.DataFrame, path: Path) -> None:
         x_col = "time_sec" if "time_sec" in truth.columns else "sample_index"
         if x_col == "time_sec":
             start_s, end_s = _forecast_xlim(group, truth, x_col, zoom_start_s, zoom_end_s)
-            truth = truth[truth[x_col].between(start_s, end_s)]
-            group = group[group[x_col].between(start_s, end_s)]
+            available_start = float(pd.to_numeric(truth[x_col], errors="coerce").min())
+            available_end = float(pd.to_numeric(truth[x_col], errors="coerce").max())
+            truth_zoom = truth[truth[x_col].between(start_s, end_s)]
+            group_zoom = group[group[x_col].between(start_s, end_s)]
+            if truth_zoom.empty or group_zoom.empty:
+                start_s, end_s = _nearest_available_window(
+                    start_s,
+                    end_s,
+                    available_start,
+                    available_end,
+                )
+                truth_zoom = truth[truth[x_col].between(start_s, end_s)]
+                group_zoom = group[group[x_col].between(start_s, end_s)]
+            truth = truth_zoom
+            group = group_zoom
         if truth.empty or group.empty:
             for ax in plot_axes[:, col]:
                 ax.text(0.5, 0.5, "No samples in zoom window", ha="center", va="center")
@@ -560,20 +573,59 @@ def _forecast_xlim(
     configured_start: object,
     configured_end: object,
 ) -> tuple[float, float]:
+    values = pd.to_numeric(truth[x_col], errors="coerce").dropna()
+    if values.empty:
+        return 0.0, 1.0
+    available_start = float(values.min())
+    available_end = float(values.max())
+    if available_end <= available_start:
+        return available_start, available_start + 1.0
     if configured_start is not None and configured_end is not None:
-        return float(configured_start), float(configured_end)
+        requested_start = float(configured_start)
+        requested_end = float(configured_end)
+        if requested_end < requested_start:
+            requested_start, requested_end = requested_end, requested_start
+        if requested_end > requested_start:
+            overlap_start = max(requested_start, available_start)
+            overlap_end = min(requested_end, available_end)
+            if overlap_end > overlap_start:
+                return requested_start, requested_end
+            return _nearest_available_window(
+                requested_start,
+                requested_end,
+                available_start,
+                available_end,
+            )
     starts = (
         pd.to_numeric(group["forecast_start_time_sec"], errors="coerce").dropna()
         if "forecast_start_time_sec" in group.columns
         else pd.Series(dtype=float)
     )
     if starts.empty:
-        return float(truth[x_col].min()), float(truth[x_col].max())
+        return available_start, available_end
     start = float(starts.min())
-    stop = min(float(truth[x_col].max()), float(starts.max()) + 10.0)
+    stop = min(available_end, float(starts.max()) + 10.0)
     if stop <= start:
-        stop = float(truth[x_col].max())
+        stop = available_end
     return start, stop
+
+
+def _nearest_available_window(
+    requested_start: float,
+    requested_end: float,
+    available_start: float,
+    available_end: float,
+) -> tuple[float, float]:
+    available_width = available_end - available_start
+    requested_width = requested_end - requested_start
+    if available_width <= 0.0:
+        return available_start, available_start + 1.0
+    if requested_width <= 0.0 or requested_width >= available_width:
+        return available_start, available_end
+    requested_center = 0.5 * (requested_start + requested_end)
+    start = requested_center - 0.5 * requested_width
+    start = min(max(start, available_start), available_end - requested_width)
+    return start, start + requested_width
 
 
 def _forecast_start(group: pd.DataFrame) -> float | None:

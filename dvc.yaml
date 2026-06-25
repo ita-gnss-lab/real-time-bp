@@ -49,7 +49,6 @@ stages:
       - real_time_bp/utils/progress.py
       - real_time_bp/utils/quality.py
       - data/raw/backpropagation
-      - outputs/01_dataset
     params:
       - dataset
       - runtime
@@ -91,7 +90,6 @@ stages:
       - real_time_bp/utils/progress.py
       - real_time_bp/utils/quality.py
       - data/raw/backpropagation
-      - outputs/01_dataset
       - outputs/03_filter_bank/filter_bank_estimates.csv
     params:
       - dataset
@@ -102,10 +100,6 @@ stages:
       - sliding.var_order_max
       - sliding.practical_fft_m
       - sliding.practical_latency_samples
-      - sliding.var_whiteness_test_lags
-      - sliding.var_diagnostic_whiteness_lags
-      - sliding.var_forecast_horizons_samples
-      - sliding.var_forecast_eval_samples
       - sliding.forecast_example_c_n0_db_hz
       - sliding.forecast_example_block_len
       - sliding.forecast_example_latency_samples
@@ -113,8 +107,6 @@ stages:
       - tvd
     outs:
       - outputs/04_sliding/sliding_var_orders.csv
-      - outputs/04_sliding/sliding_var_residual_summary.csv
-      - outputs/04_sliding/sliding_var_forecast_utility.csv
       - outputs/04_sliding/sliding_practical_metrics.csv
       - outputs/04_sliding/sliding_forecast_example.csv
 
@@ -155,7 +147,6 @@ stages:
       - quality_control
       - tvd
     outs:
-      - outputs/04_sliding/sliding_latency_heatmap_cases.csv
       - outputs/04_sliding/sliding_latency_heatmap.csv
 
   representative_results:
@@ -199,7 +190,6 @@ stages:
       - representatives
       - tvd
     outs:
-      - outputs/02_cycle_slips/tvd_representative_cases.csv
       - outputs/02_cycle_slips/tvd_example_traces.csv
       - outputs/03_filter_bank/filter_bank_representative_score_curves.csv
       - outputs/03_filter_bank/filter_bank_representative_phase_traces.csv
@@ -221,21 +211,24 @@ stages:
       - real_time_bp/methodology/filter_bank.py
       - real_time_bp/utils/params.py
       - real_time_bp/utils/progress.py
-      - outputs/01_dataset
-      - outputs/02_cycle_slips/tvd_representative_cases.csv
       - outputs/02_cycle_slips/tvd_example_traces.csv
-      - outputs/03_filter_bank
+      - outputs/03_filter_bank/filter_bank_representative_phase_traces.csv
+      - outputs/03_filter_bank/filter_bank_representative_score_curves.csv
+      - outputs/03_filter_bank/filter_bank_boxplot_estimates.csv
+      - outputs/03_filter_bank/filter_bank_n_init_sensitivity.csv
       - outputs/04_sliding/sliding_var_orders.csv
       - outputs/04_sliding/sliding_practical_metrics.csv
       - outputs/04_sliding/sliding_latency_heatmap.csv
       - outputs/04_sliding/sliding_phase_example.csv
       - outputs/04_sliding/sliding_forecast_example.csv
     params:
-      - plots
-      - experiments
-      - sliding
-      - representatives
-      - tvd
+      - plots.forecast_zoom_start_s
+      - plots.forecast_zoom_end_s
+      - experiments.n_init_samples
+      - experiments.n_init_samples_boxplot
+      - experiments.score_curve_n_init_samples
+      - sliding.forecast_example_latency_samples
+      - tvd.fade_threshold_db
     plots:
       - results/figures
     outs:

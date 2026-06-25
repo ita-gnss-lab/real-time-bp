@@ -44,25 +44,7 @@ TRACE_COLUMNS = [
     "integer_cycle_bias",
     "is_fade_minimum",
 ]
-REPRESENTATIVE_COLUMNS = [
-    "tracking_case_id",
-    "example_idx",
-    "c_n0_idx",
-    "severity",
-    "frequency",
-    "svid",
-    "input_c_n0_db_hz",
-    "init_doppler_error_hz",
-    "loss_of_lock",
-    "true_fresnel_time_scale_s",
-    "n_tvd_cycle_slips",
-    "cycle_slips_per_minute",
-    "diffractive_phase_slope_cycles_per_s",
-    "abs_diffractive_phase_slope_cycles_per_s",
-    "diffractive_phase_span_cycles",
-]
 STAGE_DIR = "02_cycle_slips"
-REPRESENTATIVES_CSV = "tvd_representative_cases.csv"
 TRACES_CSV = "tvd_example_traces.csv"
 
 
