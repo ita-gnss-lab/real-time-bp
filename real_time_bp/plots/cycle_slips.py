@@ -155,7 +155,7 @@ def plot_cycle_slips() -> None:
                 color=COLORS["batch"],
                 linestyle="--",
                 linewidth=1.0,
-                label=r"$\hat{\phi}_{r,\mathrm{batch}}$",
+                label=r"$\hat{\phi}^{(\mathrm{batch})}_{r}$",
             )
         else:
             phase_ax.plot(
@@ -192,7 +192,7 @@ def plot_cycle_slips() -> None:
                 batch_error,
                 color=COLORS["batch"],
                 linewidth=1.0,
-                label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
+                label=r"$\hat{\phi}^{(\mathrm{batch})}_{r}-\phi_r$",
             )
         integer_cycle_bias = _zero_reference_cycles(group["integer_cycle_bias"])
         error_ax.step(

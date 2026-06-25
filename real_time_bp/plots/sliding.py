@@ -149,13 +149,13 @@ def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
             color=color,
             linestyle="--",
             alpha=0.75,
-            label=rf"{severity} batch BP",
+            label=rf"{severity} $\mathrm{{CS/min}}_{{\phi_r}}^{{(\mathrm{{batch}})}}$",
         )
         axes[1].plot(
             clean["input_c_n0_db_hz"],
             clean[sliding_cs_col],
             color=color,
-            label=rf"{severity} sliding BP",
+            label=rf"{severity} $\mathrm{{CS/min}}_{{\phi_r}}^{{(\mathrm{{sliding}})}}$",
         )
         axes[1].plot(
             clean["input_c_n0_db_hz"],
@@ -163,7 +163,7 @@ def _plot_practical_metrics(df: pd.DataFrame, path: Path) -> None:
             color=color,
             linestyle=":",
             linewidth=1.2,
-            label=rf"{severity} TVD $\hat{{\phi}}_s-\phi_r$",
+            label=rf"{severity} $\mathrm{{CS/min}}_{{\phi_s}}$",
         )
     axes[0].set_xlabel(r"$C/N_0$ [dB-Hz]")
     axes[0].set_ylabel(r"$\mathrm{MRMSE}$ [rad]")
@@ -225,7 +225,7 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
                     metric_vmax,
                     r"$\mathrm{MRMSE}_{\phi_r}^{(\mathrm{sliding})}$ [rad]",
                 ),
-                (cs_pivot, cs_vmin, cs_vmax, "CS/min"),
+                (cs_pivot, cs_vmin, cs_vmax, r"$\mathrm{CS/min}^{(\mathrm{sliding})}_{\phi_r}$"),
             ]
         ):
             ax = axes[row, col]
@@ -382,15 +382,15 @@ def _plot_phase_example(df: pd.DataFrame, path: Path) -> None:
                 phase_error_cycles,
                 color=color,
                 linewidth=1.0,
-                label=rf"$\hat{{\phi}}_{{r,\mathrm{{sliding}}}}-\phi_r$, $L={int(latency)}$",
+                label=rf"$\hat{{\phi}}^{{(\mathrm{{sliding}})}}_{{r}}-\phi_r$, $L={int(latency)}$",
             )
         ax.plot(
             base["time_sec"],
             batch_error_cycles,
             color=COLORS["truth"],
             linewidth=1.1,
-            zorder=6,
-            label=r"$\hat{\phi}_{r,\mathrm{batch}}-\phi_r$",
+            zorder=6,   
+            label=r"$\hat{\phi}^{(\mathrm{batch})}_{r}-\phi_r$",
         )
         if finite_times:
             ax.set_xlim(min(finite_times), max(finite_times))
