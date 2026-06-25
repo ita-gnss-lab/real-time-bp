@@ -13,7 +13,7 @@ FONT_SIZES_PT = {
     "title": 11,
     "label": 10,
     "tick": 9,
-    "legend": 9,
+    "legend": 7.5,
     "annotation": 8,
 }
 

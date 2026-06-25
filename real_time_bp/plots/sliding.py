@@ -261,12 +261,12 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
                     else "Latency [samples]"
                 )
             ax.text(
-                0.02,
+                0.96,
                 0.96,
                 title,
                 transform=ax.transAxes,
                 va="top",
-                ha="left",
+                ha="right",
                 fontsize=FONT_SIZES_PT["annotation"],
                 color="black",
             )
@@ -276,9 +276,10 @@ def _plot_latency_heatmap(df: pd.DataFrame, path: Path) -> None:
             ax=axes[0, :],
             label=r"$\mathrm{MRMSE}_{\phi_r}^{(\mathrm{sliding})}$ [rad]",
             fraction=0.03,
+            pad=0.0075,
         )
     if cs_image is not None:
-        fig.colorbar(cs_image, ax=axes[1, :], label="CS/min", fraction=0.03)
+        fig.colorbar(cs_image, ax=axes[1, :], label="CS/min", fraction=0.03, pad=0.0075)
     save_figure(fig, path, tight=False)
 
 

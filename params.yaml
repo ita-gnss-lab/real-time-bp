@@ -7,7 +7,7 @@ runtime:
   csv_chunksize: 75000
   csv_write_batch_rows: 50000
   # One process-pool size shared by TVD, filter-bank, and sliding stages.
-  parallel_workers: 12
+  parallel_workers: 32
 
 constants:
   speed_of_light_m_s: 299792458.0
@@ -104,13 +104,13 @@ plots:
   csv_dir: outputs
   csv_tables_dir: results/csv_tables
   figures_dir: results/figures
-  forecast_zoom_start_s: 310.0
-  forecast_zoom_end_s: 370.0
+  forecast_zoom_start_s: 240.0
+  forecast_zoom_end_s: 300.0
   forecast_zoom_latency_samples: 0
 
 representatives:
   # Change these ranks to inspect different representative examples. DVC only
   # needs to rerun the lightweight representative-results and plotting stages.
   case_rank_by_severity:
-    weak: 2
-    strong: 2
+    weak: 500
+    strong: 350
