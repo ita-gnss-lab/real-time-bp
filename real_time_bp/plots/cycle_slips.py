@@ -47,7 +47,7 @@ def plot_cycle_slips() -> None:
     fig, axes = plt.subplots(
         3,
         len(severities),
-        figsize=grid_figure_size(len(severities), 3, panel_height_cm=5.0),
+        figsize=grid_figure_size(len(severities), 3, panel_width_cm=12, panel_height_cm=4),
         sharex="col",
         constrained_layout=True,
         squeeze=False,

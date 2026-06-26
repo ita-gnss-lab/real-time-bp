@@ -621,8 +621,8 @@ stages:
       size: 2289
     - path: real_time_bp/plots/cycle_slips.py
       hash: md5
-      md5: 9755821e5607df5ebedb0de2ff5ee047
-      size: 9229
+      md5: 4990be9c6e00f53b143722bd5a646b30
+      size: 9246
     - path: real_time_bp/plots/filter_bank.py
       hash: md5
       md5: f085e6536c8873296b2682f7866aa8b0
@@ -676,8 +676,8 @@ stages:
       nfiles: 0
     - path: results/figures
       hash: md5
-      md5: d6b53619ce2f01051650692c7eba456c.dir
-      size: 2899691
+      md5: ff8d6ee40e0597f4437b6d5bef94bab2.dir
+      size: 2900430
       nfiles: 8
   representative_results:
     cmd: uv run python -m real_time_bp.scripts.get_representative_results
